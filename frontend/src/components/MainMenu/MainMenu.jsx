@@ -2,9 +2,9 @@
 import React from "react";
 import { motion } from "motion/react";
 import { useSelector } from "react-redux";
-import RPSense from "./RPSense";
+import RPSense from "../CustomUI/RPSense";
 import PlayerModal from "./PlayerModal";
-import { selectCurrentPlayer } from "../redux/slices/gameDataSlice";
+import { selectCurrentPlayer } from "../../redux/slices/gameDataSlice";
 
 const MainMenu = ({ navigateTo }) => {
   // Get current player from Redux
@@ -126,13 +126,13 @@ const MainMenu = ({ navigateTo }) => {
           <motion.div className="space-y-6" variants={containerVariants}>
             <motion.div variants={itemVariants}>
               <MenuText onClick={() => navigateTo("play")}>
-                Start Game
+                Play
               </MenuText>
             </motion.div>
 
             <motion.div variants={itemVariants}>
               <MenuText onClick={() => navigateTo("scores")}>
-                High Scores
+              Scores
               </MenuText>
             </motion.div>
 

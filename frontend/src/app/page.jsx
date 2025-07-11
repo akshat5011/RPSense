@@ -2,14 +2,14 @@
 import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import PageTransition from "../components/PageTransition";
-import MainMenu from "../components/MainMenu";
-import GamePlay from "../components/GamePlay";
+import MainMenu from "../components/MainMenu/MainMenu";
+import GamePlay from "../components/MainMenu/GamePlay";
 import Scores from "../components/Scores";
 import Settings from "../components/Settings";
 import HowToPlay from "../components/HowToPlay";
-import Loading from "../components/Loading";
+import Loading from "../components/CustomUI/Loading";
 import { selectCurrentView, setCurrentView } from "../redux/slices/viewSlice";
-import RPSense from "@/components/RPSense";
+import RPSense from "@/components/CustomUI/RPSense";
 import { changePlayerByName } from "../redux/slices/gameDataSlice";
 
 
@@ -59,8 +59,8 @@ function SinglePageApp() {
 
   const renderCurrentView = () => {
     switch (
-      //currentView // Using Redux state
-      'menu'
+      currentView // Using Redux state
+      
     ) {
       case "menu":
         return (

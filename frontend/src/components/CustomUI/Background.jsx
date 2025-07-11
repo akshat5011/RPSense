@@ -6,7 +6,7 @@ import {
   useMotionValue,
   useTransform,
 } from "motion/react";
-import { Meteors } from "./meteors";
+import { Meteors } from "../meteors";
 
 const Background = () => {
   const containerRef = useRef(null);

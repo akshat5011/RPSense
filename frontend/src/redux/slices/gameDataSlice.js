@@ -128,6 +128,11 @@ const gameDataSlice = createSlice({
 
     deletePlayer: (state, action) => {
       const playerId = action.payload;
+
+      if (state.players.length <= 1) {
+        return;
+      }
+
       const playerIndex = state.players.findIndex(
         (player) => player.id === playerId
       );
