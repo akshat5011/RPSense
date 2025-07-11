@@ -190,3 +190,14 @@ button.exit:hover {
 .animate-meteor-effect {
   animation: meteor-effect linear infinite;
 }
+
+/* Hide scrollbar for webkit browsers (Chrome, Safari) */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Alternative approach - make scrollbar invisible but functional */
+.scrollbar-invisible::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}

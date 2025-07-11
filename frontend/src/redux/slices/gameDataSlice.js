@@ -72,7 +72,7 @@ const gameDataSlice = createSlice({
       }
     },
 
-    clearAllMatches: (state) => {
+    wtches: (state) => {
       state.matches = [];
     },
 

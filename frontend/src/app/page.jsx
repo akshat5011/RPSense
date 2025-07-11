@@ -44,7 +44,7 @@ function SinglePageApp() {
 
   const renderCurrentView = () => {
     switch (
-      currentView // Using Redux state
+      'settings' // Using Redux state
     ) {
       case "menu":
         return <MainMenu navigateTo={navigateTo} />;
