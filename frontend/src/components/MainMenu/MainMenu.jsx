@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { useSelector } from "react-redux";
 import RPSense from "../CustomUI/RPSense";
 import PlayerModal from "./PlayerModal";
-import { selectCurrentPlayer } from "../../redux/slices/gameDataSlice";
+import { selectCurrentPlayer } from "@/redux/slices/gameDataSlice";
 
 const MainMenu = ({ navigateTo }) => {
   // Get current player from Redux

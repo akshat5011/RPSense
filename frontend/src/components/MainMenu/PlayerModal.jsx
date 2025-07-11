@@ -19,7 +19,7 @@ import {
   deletePlayer,
   updatePlayer,
   setCurrentPlayer,
-} from "../../redux/slices/gameDataSlice";
+} from "@/redux/slices/gameDataSlice";
 
 const PlayerModal = ({ children }) => {
   const dispatch = useDispatch();
