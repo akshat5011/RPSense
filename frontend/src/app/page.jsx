@@ -1,27 +1,50 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import GameButton from '../components/GameButton';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import MainMenu from "../components/MainMenu";
+import GamePlay from "../components/GamePlay";
+import Scores from "../components/Scores";
+import Settings from "../components/Settings";
+import HowToPlay from "../components/HowToPlay";
 
-function Page() {
-  const [playerName, setPlayerName] = useState('player 1');
+function SinglePageApp() {
+  const [currentView, setCurrentView] = useState("menu");
+  const [playerName, setPlayerName] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [gameData, setGameData] = useState({
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    totalGames: 0,
+    streak: 0,
+    bestStreak: 0,
+  });
 
   useEffect(() => {
     setMounted(true);
-    // Load player name from localStorage
-    const savedName = localStorage.getItem('playerName');
+    // Load data from localStorage
+    const savedName = localStorage.getItem("playerName");
+    const savedGameData = localStorage.getItem("gameData");
+
     if (savedName) {
       setPlayerName(savedName);
+    }
+    if (savedGameData) {
+      setGameData(JSON.parse(savedGameData));
     }
   }, []);
 
   useEffect(() => {
-    // Save player name to localStorage whenever it changes
+    // Save data to localStorage
     if (playerName) {
-      localStorage.setItem('playerName', playerName);
+      localStorage.setItem("playerName", playerName);
     }
-  }, [playerName]);
+    localStorage.setItem("gameData", JSON.stringify(gameData));
+  }, [playerName, gameData]);
+
+  const navigateTo = (view) => {
+    setCurrentView(view);
+  };
 
   const handleExit = () => {
     window.close();
@@ -29,89 +52,126 @@ function Page() {
 
   if (!mounted) return null;
 
+  const pageVariants = {
+    initial: { opacity: 0, scale: 0.95 },
+    in: { opacity: 1, scale: 1 },
+    out: { opacity: 0, scale: 0.95 },
+  };
+
+  const pageTransition = {
+    type: "spring",
+    stiffness: 120,
+    damping: 20,
+    duration: 0.6,
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/20"></div>
-      
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8 }}
-        className="relative z-10 bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 max-w-md w-full"
-      >
-        {/* Game Title */}
-        <motion.div 
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl font-bold text-white mb-2 tracking-wide">
-            🪨 📄 ✂️
-          </h1>
-          <h2 className="text-3xl font-bold  mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-            Rock Paper Scissors
-          </h2>
-          <div className="w-20 h-1 bg-gradient-to-r from-yellow-400 to-orange-500 mx-auto rounded-full"></div>
-        </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] overflow-hidden relative">
+      {/* Neon Glow Overlay */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="absolute inset-0 bg-gradient-radial from-cyan-400/10 via-purple-600/10 to-transparent"></div>
+      </div>
 
-        {/* Player Input */}
-        <motion.div 
-          initial={{ x: -50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          className="mb-8"
-        >
-        </motion.div>
+      {/* Animated Particle Background */}
+      <div className="absolute inset-0 z-0">
+        {[...Array(60)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-cyan-400/30 rounded-full shadow-[0_0_16px_4px_rgba(0,255,255,0.4)]"
+            animate={{
+              x: [0, Math.random() * 100, 0],
+              y: [0, Math.random() * 100, 0],
+              opacity: [0.7, 1, 0.7],
+            }}
+            transition={{
+              duration: Math.random() * 8 + 8,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              filter: "blur(1px)",
+            }}
+          />
+        ))}
+      </div>
 
-        {/* Game Buttons */}
-        <motion.div 
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.6 }}
-          className="space-y-4"
-        >
-          <GameButton 
-            label="🎮 Play" 
-            link="/play" 
-            variant="primary"
-            disabled={!playerName.trim()}
+      {/* Neon Hand Outline */}
+      <div className="absolute left-1/2 top-1/2 z-0 pointer-events-none" style={{ transform: "translate(-50%, -60%)" }}>
+        <svg width="320" height="320" viewBox="0 0 320 320" fill="none">
+          <motion.path
+            d="M80 220 Q100 180 120 220 Q140 260 160 220 Q180 180 200 220 Q220 260 240 220 Q260 180 280 220"
+            stroke="cyan"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            initial={{ filter: "drop-shadow(0 0 24px #0ff)" }}
+            animate={{
+              stroke: ["#0ff", "#a0f", "#0ff"],
+              filter: [
+                "drop-shadow(0 0 24px #0ff)",
+                "drop-shadow(0 0 32px #a0f)",
+                "drop-shadow(0 0 24px #0ff)",
+              ],
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
           />
-          <GameButton 
-            label="🏆 Scores" 
-            link="/scores" 
-            variant="secondary"
-          />
-          <GameButton 
-            label="⚙️ Settings" 
-            link="/settings" 
-            variant="secondary"
-          />
-          <GameButton 
-            label="❓ How to Play" 
-            link="/how-to-play" 
-            variant="secondary"
-          />
-          <button 
-            onClick={handleExit}
-            className="w-full py-3 px-6 bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg backdrop-blur-sm border border-red-500/30"
-          >
-            🚪 Exit
-          </button>
-        </motion.div>
+        </svg>
+      </div>
 
-        {/* Footer */}
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 0.6 }}
-          className="text-center text-white/60 text-sm mt-6"
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentView}
+          initial="initial"
+          animate="in"
+          exit="out"
+          variants={pageVariants}
+          transition={pageTransition}
+          className="relative z-10 h-screen flex items-center justify-center"
         >
-          {playerName ? `Welcome back, ${playerName}!` : 'Enter your name to start playing'}
-        </motion.p>
-      </motion.div>
+          {currentView === "menu" && (
+            <MainMenu
+              playerName={playerName}
+              setPlayerName={setPlayerName}
+              navigateTo={navigateTo}
+              handleExit={handleExit}
+            />
+          )}
+          {currentView === "play" && (
+            <GamePlay
+              playerName={playerName}
+              gameData={gameData}
+              setGameData={setGameData}
+              navigateTo={navigateTo}
+            />
+          )}
+          {currentView === "scores" && (
+            <Scores
+              gameData={gameData}
+              playerName={playerName}
+              navigateTo={navigateTo}
+            />
+          )}
+          {currentView === "settings" && (
+            <Settings
+              navigateTo={navigateTo}
+              playerName={playerName}
+              setPlayerName={setPlayerName}
+            />
+          )}
+          {currentView === "how-to-play" && (
+            <HowToPlay navigateTo={navigateTo} />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
 
-export default Page;
+export default SinglePageApp;

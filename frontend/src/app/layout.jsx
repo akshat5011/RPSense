@@ -1,7 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Provider as ReduxProvider} from "react-redux";
-import store from "@/redux/store";
+import { ReduxProvider } from "@/redux/ReduxProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,16 +23,9 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-      <ReduxProvider store={store}>
-        <header>
-        
-          <h1>Rock Paper Scissors</h1>
-        </header>
-        <main>{children}</main>
-        <footer>
-          <p>&copy; 2025 Rock Paper Scissors Game</p>
-        </footer>
-      </ReduxProvider>
+        <ReduxProvider>
+          <main>{children}</main>
+        </ReduxProvider>
       </body>
     </html>
   );
