@@ -25,9 +25,11 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ReduxProvider>
-          <div className="min-h-screen relative">
+          <div className="h-screen w-screen overflow-hidden relative">
             <Background />
-            <main className="relative">{children}</main>
+            <main className="relative h-full w-full overflow-hidden">
+              {children}
+            </main>
           </div>
         </ReduxProvider>
       </body>

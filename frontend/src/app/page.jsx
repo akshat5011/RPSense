@@ -59,7 +59,8 @@ function SinglePageApp() {
 
   const renderCurrentView = () => {
     switch (
-      currentView // Using Redux state
+      //currentView // Using Redux state
+      'menu'
     ) {
       case "menu":
         return (
@@ -87,12 +88,11 @@ function SinglePageApp() {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden">
-      <PageTransition currentView={currentView}>
+     <div className="h-screen w-screen overflow-hidden relative">
+    <PageTransition currentView={currentView}>
       {renderCurrentView()}
     </PageTransition>
-     
-    </div>
+  </div>
   );
 }
 
