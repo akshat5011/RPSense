@@ -9,7 +9,7 @@ const nullStateHandler = {
 // Load initial state from localStorage if available
 const loadStateFromStorage = () => {
   if (typeof window === "undefined") {
-    return;
+    return nullStateHandler;
   }
   try {
     const serializedState = localStorage.getItem("rpsense_view_state");
