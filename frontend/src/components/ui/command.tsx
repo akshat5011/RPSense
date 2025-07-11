@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/shadcnui/dialog"
+} from "@/components/ui/dialog"
 
 function Command({
   className,

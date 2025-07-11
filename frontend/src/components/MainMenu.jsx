@@ -3,6 +3,7 @@ import React from "react";
 import { motion } from "motion/react";
 import { useSelector } from "react-redux";
 import RPSense from "./RPSense";
+import PlayerModal from "./PlayerModal";
 import { selectCurrentPlayer } from "../redux/slices/gameDataSlice";
 
 const MainMenu = ({ navigateTo }) => {
@@ -79,6 +80,22 @@ const MainMenu = ({ navigateTo }) => {
     visible: { opacity: 1, y: 0 },
   };
 
+  const handleExit = () => {
+    const confirmExit = window.confirm("Exit RPSense?");
+    
+    if (confirmExit) {
+      localStorage.setItem("rpsense_last_exit", new Date().toISOString());
+      window.close();
+      
+      setTimeout(() => {
+        if (!window.closed) {
+          const shortcutKey = navigator.platform.includes('Mac') ? 'Cmd+W' : 'Ctrl+W';
+          alert(`Please press ${shortcutKey} to close this tab`);
+        }
+      }, 500);
+    }
+  };
+
   return (
     <div className="h-screen w-screen grid grid-cols-2 overflow-hidden">
       {/* LEFT SIDE */}
@@ -91,16 +108,18 @@ const MainMenu = ({ navigateTo }) => {
         >
           {/* Header Section */}
           <motion.div className="space-y-4" variants={itemVariants}>
-            <div
-              className={`text-xl ${whiteVariants.secondary} flex items-center justify-center gap-3`}
-            >
-              <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
-              <span>Player: </span>
-              <span className={`${whiteVariants.primary} font-semibold`}>
-                {playerName}
-              </span>
-              <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
-            </div>
+            <PlayerModal>
+              <div
+                className={`text-xl ${whiteVariants.secondary} flex items-center justify-center gap-3 cursor-pointer hover:text-cyan-300 transition-colors p-2 rounded-lg hover:bg-cyan-500/10`}
+              >
+                <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+                <span>Player: </span>
+                <span className={`${whiteVariants.primary} font-semibold underline decoration-cyan-400/50`}>
+                  {playerName}
+                </span>
+                <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+              </div>
+            </PlayerModal>
           </motion.div>
 
           {/* Menu Options */}
@@ -131,7 +150,7 @@ const MainMenu = ({ navigateTo }) => {
 
             <motion.div variants={itemVariants}>
               <MenuText
-                onClick={() => window.close()}
+                onClick={handleExit}
                 className="text-red-400/80 hover:text-red-300"
               >
                 Exit Game
@@ -142,7 +161,7 @@ const MainMenu = ({ navigateTo }) => {
       </div>
 
       {/* RIGHT SIDE */}
-      <div className="relative w-full h-full bg-gradient-to-bl from-slate-900 via-blue-900/20 to-slate-900">
+      <div className="relative w-full h-full ">
         <div
           className="absolute w-full flex justify-center z-10"
           style={{ top: "25vh" }}
