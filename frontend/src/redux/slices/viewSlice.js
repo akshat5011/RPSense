@@ -1,15 +1,20 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+const nullStateHandler = {
+  currentView: "menu",
+  isTransitioning: false,
+  viewHistory: [],
+};
+
 // Load initial state from localStorage if available
 const loadStateFromStorage = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
   try {
     const serializedState = localStorage.getItem("rpsense_view_state");
     if (serializedState === null) {
-      return {
-        currentView: "menu",
-        isTransitioning: false,
-        viewHistory: [],
-      };
+      return nullStateHandler;
     }
     const parsed = JSON.parse(serializedState);
     // Reset transitioning state on reload
@@ -19,11 +24,7 @@ const loadStateFromStorage = () => {
     };
   } catch (err) {
     console.warn("Could not load view state from localStorage:", err);
-    return {
-      currentView: "menu",
-      isTransitioning: false,
-      viewHistory: [],
-    };
+    return nullStateHandler;
   }
 };
 
@@ -56,8 +57,10 @@ const viewSlice = createSlice({
     },
 
     goBack: (state) => {
-      const lastHistoryItem = state.viewHistory.pop();
-      state.currentView = lastHistoryItem.view;
+      if (state.viewHistory.length > 0) {
+        const lastHistoryItem = state.viewHistory.pop();
+        state.currentView = lastHistoryItem.view;
+      }
     },
 
     goToHistoryView: (state, action) => {
