@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import Background from "../components/Background";
+import { useSelector, useDispatch } from "react-redux";
 import PageTransition from "../components/PageTransition";
 import MainMenu from "../components/MainMenu";
 import GamePlay from "../components/GamePlay";
@@ -8,91 +8,69 @@ import Scores from "../components/Scores";
 import Settings from "../components/Settings";
 import HowToPlay from "../components/HowToPlay";
 import Loading from "../components/Loading";
+import { selectCurrentView, setCurrentView } from "../redux/slices/viewSlice";
+import RPSense from "@/components/RPSense";
+import { changePlayerByName } from "../redux/slices/gameDataSlice";
+
 
 function SinglePageApp() {
-  const [currentView, setCurrentView] = useState("menu");
+  const dispatch = useDispatch();
+  const currentView = useSelector(selectCurrentView);
+
   const [playerName, setPlayerName] = useState("");
   const [mounted, setMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [gameData, setGameData] = useState({
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    totalGames: 0,
-    streak: 0,
-    bestStreak: 0,
-  });
 
   useEffect(() => {
-    // setMounted(true);
-
-       const loadingTimer = setTimeout(() => {
+    const loadingTimer = setTimeout(() => {
       setMounted(true);
       setIsLoading(false);
-    }, 20000); // 2 second loading
+    }, 2000); // 2 second loading
 
-
-    // Load data from localStorage
     const savedName = localStorage.getItem("playerName");
-    const savedGameData = localStorage.getItem("gameData");
-
     if (savedName) {
       setPlayerName(savedName);
-    }
-    if (savedGameData) {
-      setGameData(JSON.parse(savedGameData));
+      dispatch(changePlayerByName(savedName));
     }
 
     return () => clearTimeout(loadingTimer);
+  }, [dispatch]);
 
-  }, []);
-
-  useEffect(() => {
-    // Save data to localStorage
+   useEffect(() => {
     if (playerName) {
       localStorage.setItem("playerName", playerName);
+      dispatch(changePlayerByName(playerName));
     }
-    localStorage.setItem("gameData", JSON.stringify(gameData));
-  }, [playerName, gameData]);
+  }, [playerName, dispatch]);
 
+  // Navigation function using Redux
   const navigateTo = (view) => {
-    setCurrentView(view);
+    dispatch(setCurrentView(view)); // Update global Redux state
   };
 
-  const handleExit = () => {
-    window.close();
-  };
-
-  if (!mounted) return null;
+  // Show loading screen
+  if (!mounted || isLoading) {
+    return (
+      <div className="min-h-screen overflow-hidden relative">
+        <Loading />
+      </div>
+    );
+  }
 
   const renderCurrentView = () => {
-    switch (currentView) {
+    switch (
+      currentView // Using Redux state
+    ) {
       case "menu":
         return (
           <MainMenu
-            playerName={playerName}
-            setPlayerName={setPlayerName}
             navigateTo={navigateTo}
-            handleExit={handleExit}
           />
         );
       case "play":
-        return (
-          <GamePlay
-            playerName={playerName}
-            gameData={gameData}
-            setGameData={setGameData}
-            navigateTo={navigateTo}
-          />
-        );
+        return <GamePlay playerName={playerName} navigateTo={navigateTo} />;
       case "scores":
-        return (
-          <Scores
-            gameData={gameData}
-            playerName={playerName}
-            navigateTo={navigateTo}
-          />
-        );
+        return <Scores playerName={playerName} navigateTo={navigateTo} />;
       case "settings":
         return (
           <Settings
@@ -108,25 +86,12 @@ function SinglePageApp() {
     }
   };
 
-
-
-  // Show loading screen
-    return (
-      <div className="min-h-screen overflow-hidden relative">
-        <Background />
-        <Loading />
-      </div>
-    );
-
-
-
   return (
-    <div className="min-h-screen overflow-hidden relative">
-      <Background />
-      
+    <div className="min-h-screen overflow-hidden">
       <PageTransition currentView={currentView}>
-        {renderCurrentView()}
-      </PageTransition>
+      {renderCurrentView()}
+    </PageTransition>
+     
     </div>
   );
 }

@@ -10,7 +10,7 @@ const PlayerInput = ({ playerName, setPlayerName }) => {
       transition={{ delay: 0.5 }}
       className="space-y-3"
     >
-      <label className="block text-cyan-400 font-semibold text-sm flex items-center gap-2">
+      <label className="block text-cyan-400 font-semibold text-sm items-center gap-2">
         <motion.span
           animate={{ 
             rotate: [0, 10, -10, 0],

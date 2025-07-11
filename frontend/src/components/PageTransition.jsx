@@ -25,7 +25,7 @@ const PageTransition = ({ currentView, children }) => {
         exit="out"
         variants={pageVariants}
         transition={pageTransition}
-        className="relative z-10 h-screen flex items-center justify-center"
+        className="relative z-10 h-screen"
       >
         {children}
       </motion.div>

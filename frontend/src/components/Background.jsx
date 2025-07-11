@@ -160,8 +160,8 @@ const Background = () => {
       <div className="absolute inset-0 z-5">{generateConnections()}</div>
 
       {/* Floating Geometric Shapes */}
-      <div className="absolute inset-0 z-5">
-        {[...Array(4)].map((_, i) => (
+      <div className="absolute inset-0 ">
+        {[...Array(6)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute border border-cyan-400/15 backdrop-blur-sm"
