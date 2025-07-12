@@ -11,6 +11,7 @@ import Loading from "../components/CustomUI/Loading";
 import { selectCurrentView, setCurrentView } from "../redux/slices/viewSlice";
 import RPSense from "@/components/CustomUI/RPSense";
 import { changePlayerByName } from "../redux/slices/gameDataSlice";
+import ActivePlay from "@/components/gameplay/ActivePlay";
 
 function SinglePageApp() {
   const dispatch = useDispatch();
@@ -56,6 +57,8 @@ function SinglePageApp() {
         return <Settings navigateTo={navigateTo} />;
       case "how-to-play":
         return <HowToPlay navigateTo={navigateTo} />;
+      case "game-active":
+        return <ActivePlay navigateTo={navigateTo} />;
       default:
         return null;
     }

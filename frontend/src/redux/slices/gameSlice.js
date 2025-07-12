@@ -115,5 +115,6 @@ export const selectGameStats = (state) => ({
 });
 export const selectGameHistory = (state) => state.game.gameHistory;
 export const selectGameError = (state) => state.game.error;
+export const selectCurrentRound = (state) => state.game.currentRound;
 
 export default gameSlice.reducer;
