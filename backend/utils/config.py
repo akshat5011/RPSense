@@ -10,7 +10,7 @@ class Config:
     
     # Model configuration
     MODEL_INPUT_SIZE = (224, 224)
-    CLASSES = ['rock', 'paper', 'scissors', 'invalid']
+    CLASSES = ['invalid', 'paper', 'rock', 'scissors']
     CONFIDENCE_THRESHOLD = 0.75
     
     # Frame processing configuration
@@ -30,4 +30,4 @@ class Config:
     PORT = 5000
     
     # Image processing
-    HAND_BBOX_PADDING = 20  # Pixels to add around detected hand
+    HAND_BBOX_PADDING = 30  # Pixels to add around detected hand

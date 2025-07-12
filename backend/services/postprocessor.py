@@ -39,6 +39,7 @@ class PredictionPostprocessor:
         )
 
         # Get most common prediction
+        # get this n=1 means top 1 most common  eg. [('rock', 3)]
         most_common_prediction = prediction_counts.most_common(1)[0][0]
 
         # Find frame with highest confidence for the most common prediction

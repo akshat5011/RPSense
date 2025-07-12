@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from utils.config import Config
 
-
+# Process only 1 frame at a time
 class ModelInference:
     def __init__(self):
         self.model = None
@@ -29,17 +29,25 @@ class ModelInference:
         try:
             # Run prediction
             predictions = self.model.predict(preprocessed_image, verbose=0)
+            # print(f"✅ Predictions: {predictions}")
 
             # Get class with highest probability
             predicted_class_idx = np.argmax(predictions[0])
+            # print(f"✅ Predicted class index: {predicted_class_idx}")
+
             confidence = float(predictions[0][predicted_class_idx])
+            # print(f"✅ Confidence: {confidence}")
+
+            # Get class name
             predicted_class = self.classes[predicted_class_idx]
+            # print(f"✅ Predicted class: {predicted_class}")
 
             # Create prediction dictionary
             all_predictions = {
                 class_name: float(prob)
                 for class_name, prob in zip(self.classes, predictions[0])
             }
+            # print(f"✅ All predictions: {all_predictions}")
 
             return predicted_class, confidence, all_predictions
 

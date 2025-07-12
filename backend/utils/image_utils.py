@@ -1,8 +1,6 @@
 import cv2
 import numpy as np
 import base64
-from io import BytesIO
-from PIL import Image
 
 
 def decode_frame_from_base64(base64_string):
@@ -21,7 +19,7 @@ def decode_frame_from_base64(base64_string):
         # Decode to OpenCV image
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        return img
+        return img  # BGR color image
     except Exception as e:
         print(f"Error decoding frame: {str(e)}")
         return None
@@ -43,10 +41,12 @@ def encode_frame_to_base64(img):
 
 
 def extract_hand_roi(image, hand_landmarks, padding=20):
-    """Extract hand region of interest from image"""
+    """Extract hand region of interest from image using MediaPipe landmarks"""
+    if hand_landmarks is None or len(hand_landmarks.landmark) == 0:
+        return None, None
+
     h, w, _ = image.shape
 
-    # Get hand bounding box
     x_coords = [landmark.x * w for landmark in hand_landmarks.landmark]
     y_coords = [landmark.y * h for landmark in hand_landmarks.landmark]
 
@@ -55,9 +55,10 @@ def extract_hand_roi(image, hand_landmarks, padding=20):
     y_min = max(0, int(min(y_coords)) - padding)
     y_max = min(h, int(max(y_coords)) + padding)
 
-    # Extract ROI
-    roi = image[y_min:y_max, x_min:x_max]
+    if x_max - x_min <= 0 or y_max - y_min <= 0:
+        return None, None
 
+    roi = image[y_min:y_max, x_min:x_max]
     return roi, (x_min, y_min, x_max, y_max)
 
 

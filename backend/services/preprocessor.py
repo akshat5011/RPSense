@@ -20,7 +20,7 @@ class ImagePreprocessor:
             rgb_image = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
 
             # Expand dimensions for batch processing
-            img_array = np.expand_dims(rgb_image, axis=0)
+            img_array = np.expand_dims(rgb_image, axis=0)   #✅ Model expects input shape of (1, H, W, 3)
 
             # Apply MobileNetV2 preprocessing
             preprocessed = preprocess_input(img_array.astype(np.float32))
