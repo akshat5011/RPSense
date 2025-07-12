@@ -201,3 +201,29 @@ button.exit:hover {
   width: 0px;
   background: transparent;
 }
+
+/* Custom Scrollbar Styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #06b6d4, #0891b2);
+  border-radius: 4px;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #0891b2, #0e7490);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: rgba(30, 41, 59, 0.5);
+}

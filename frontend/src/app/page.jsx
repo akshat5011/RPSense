@@ -23,7 +23,7 @@ function SinglePageApp() {
     const loadingTimer = setTimeout(() => {
       setMounted(true);
       setIsLoading(false);
-    }, 2000); // 2 second loading
+    }, 3000); // 3 second loading
 
     return () => clearTimeout(loadingTimer);
   }, []);
@@ -44,7 +44,7 @@ function SinglePageApp() {
 
   const renderCurrentView = () => {
     switch (
-      'settings' // Using Redux state
+      currentView // Using Redux state
     ) {
       case "menu":
         return <MainMenu navigateTo={navigateTo} />;
