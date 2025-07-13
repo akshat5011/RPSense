@@ -54,6 +54,16 @@ const gameSlice = createSlice({
       state.isGameActive = false;
     },
     
+    updateScore: (state, action) => {
+      const { player, computer } = action.payload;
+      state.playerScore += player;
+      state.computerScore += computer;
+    },
+    
+    nextRound: (state) => {
+      state.currentRound += 1;
+    },
+    
     addRoundResult: (state, action) => {
       const { playerChoice, computerChoice, result } = action.payload;
       
@@ -96,6 +106,8 @@ export const {
   setIsLoading,
   startGame,
   endGame,
+  updateScore,
+  nextRound,
   addRoundResult,
   resetGame,
   setError,

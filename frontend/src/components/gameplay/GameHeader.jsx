@@ -18,8 +18,8 @@ const GameHeader = ({ navigateTo, gameInfo, gameMode }) => {
 
       {/* Game Info */}
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-white mb-1">
-          Rock Paper Scissors
+        <h1 className="text-4xl mb-1 font-bold bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 bg-clip-text text-transparent tracking-wide">
+          RPSense
         </h1>
         <div className="text-cyan-400">
           Round {gameInfo.currentRound} of {gameInfo.totalRounds} •{" "}
