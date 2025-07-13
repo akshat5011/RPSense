@@ -55,7 +55,63 @@ const ActivePlay = ({ navigateTo }) => {
 
   // Initialize Socket.IO connection
   const initSocket = () => {
-    socketRef.current = io(ML_SERVER);
+    console.log("🔍 Connecting to:", ML_SERVER);
+
+    socketRef.current = io(ML_SERVER, {
+      // Force WebSocket first, fallback to polling
+      transports: ["websocket", "polling"],
+
+      // Connection options
+      forceNew: true,
+      upgrade: true,
+      autoConnect: true,
+      reconnection: true,
+      timeout: 20000,
+
+      // ngrok specific headers
+      extraHeaders: {
+        "ngrok-skip-browser-warning": "true",
+        Origin: window.location.origin,
+      },
+
+      // Enhanced transport options for ngrok
+      transportOptions: {
+        polling: {
+          extraHeaders: {
+            "ngrok-skip-browser-warning": "true",
+            Origin: window.location.origin,
+          },
+        },
+        websocket: {
+          extraHeaders: {
+            "ngrok-skip-browser-warning": "true",
+          },
+        },
+      },
+
+      // Force immediate connection
+      rememberUpgrade: false,
+      timestampRequests: false,
+    });
+
+    socketRef.current.on("connect", () => {
+      console.log("✅ Socket connected successfully!");
+      console.log("✅ Transport:", socketRef.current.io.engine.transport.name);
+      console.log("✅ Socket ID:", socketRef.current.id);
+      setSocketConnected(true);
+    });
+
+    socketRef.current.on("connect_error", (error) => {
+      console.error("❌ Connection error:", error.message);
+      console.error("Error type:", error.type);
+      console.error("Error description:", error.description);
+
+      // Try switching transport on error
+      if (error.type === "TransportError") {
+        console.log("🔄 Switching to polling transport...");
+        socketRef.current.io.opts.transports = ["polling"];
+      }
+    });
 
     socketRef.current.on("connected", (data) => {
       console.log("✅ Connected to ML server:", data);
@@ -187,20 +243,20 @@ const ActivePlay = ({ navigateTo }) => {
       playerName: currentPlayer?.name || "Player",
     });
 
-    // Start sending frames at 10fps for 2 seconds
-    frameIntervalRef.current = setInterval(() => {
-      sendFrameToSocket();
-    }, 100); // 100ms = 10fps
+    // Use more stable frame timing
+    let frameCount = 0;
+    const maxFrames = 20; // 2 seconds at 10fps
 
-    // Stop after 2 seconds
-    setTimeout(() => {
-      if (frameIntervalRef.current) {
+    frameIntervalRef.current = setInterval(() => {
+      if (frameCount < maxFrames) {
+        sendFrameToSocket();
+        frameCount++;
+      } else {
         clearInterval(frameIntervalRef.current);
         frameIntervalRef.current = null;
       }
-    }, 2000);
+    }, 100); // 100ms = 10fps
   };
-
   // Send frame via socket
   const sendFrameToSocket = () => {
     if (!videoRef.current || !canvasRef.current || !socketRef.current) return;
@@ -209,14 +265,20 @@ const ActivePlay = ({ navigateTo }) => {
     const video = videoRef.current;
     const ctx = canvas.getContext("2d");
 
+    // Check if video is ready
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.log("⏳ Video not ready, skipping frame");
+      return;
+    }
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convert to base64
-    const frameBase64 = canvas.toDataURL("image/jpeg", 0.8);
+    // Convert to base64 with quality control
+    const frameBase64 = canvas.toDataURL("image/jpeg", 0.7);
 
-    // Send via socket
+    // Send via socket with unique timestamp
     socketRef.current.emit("frame_data", {
       frame: frameBase64,
       gameData: {
@@ -226,6 +288,7 @@ const ActivePlay = ({ navigateTo }) => {
         playerScore,
         computerScore,
         timestamp: Date.now(),
+        frameId: Math.random().toString(36).substr(2, 9), // Unique frame ID
       },
     });
   };

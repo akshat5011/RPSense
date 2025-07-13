@@ -1,6 +1,11 @@
 import tensorflow as tf
 import numpy as np
 from utils.config import Config
+import os
+
+# Optimize TensorFlow for inference
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Reduce TF logging
+tf.config.optimizer.set_jit(True)  # Enable XLA JIT compilation
 
 # Process only 1 frame at a time
 class ModelInference:

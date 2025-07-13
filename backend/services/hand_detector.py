@@ -9,7 +9,7 @@ class HandDetector:
         self.mp_drawing = mp.solutions.drawing_utils
 
         self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
+            static_image_mode=True,
             max_num_hands=Config.MAX_HANDS,
             min_detection_confidence=Config.HAND_DETECTION_CONFIDENCE,
             min_tracking_confidence=Config.HAND_TRACKING_CONFIDENCE,
@@ -21,6 +21,9 @@ class HandDetector:
         Returns: (status, message, results)
         """
         try:
+            # Get image dimensions
+            height, width = image.shape[:2]
+            
             # Convert BGR to RGB
             rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -33,10 +36,23 @@ class HandDetector:
             # Check for multiple hands
             if len(results.multi_hand_landmarks) > 1:
                 return "invalid", "Multiple hands detected", None
+            
+            # Single hand detected - normalize landmarks with image dimensions
+            hand_landmarks = results.multi_hand_landmarks[0]
+            
+            # Convert normalized landmarks to pixel coordinates
+            landmark_coords = []
+            for landmark in hand_landmarks.landmark:
+                x = int(landmark.x * width)
+                y = int(landmark.y * height)
+                z = landmark.z
+                landmark_coords.append([x, y, z])
 
-            # Single hand detected
-            return "success", "Single hand detected", results.multi_hand_landmarks[0]
-
+            return "success", "Single hand detected", {
+                'landmarks': hand_landmarks,
+                'coordinates': landmark_coords,
+                'image_dims': (width, height)
+            }
         except Exception as e:
             return "error", f"Hand detection error: {str(e)}", None
 

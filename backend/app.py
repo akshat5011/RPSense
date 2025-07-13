@@ -7,11 +7,38 @@ from utils.image_utils import decode_frame_from_base64
 from services.frame_processor import FrameProcessor
 from flask_socketio import SocketIO, emit
 from services.game_engine import GameEngine
+import time
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+CORS(app, 
+     origins="*",
+     allow_headers=["Content-Type", "Authorization", "ngrok-skip-browser-warning", "Origin"],
+     methods=["GET", "POST", "OPTIONS"],
+     supports_credentials=True)
+
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    allow_upgrades=True,
+    transports=['websocket', 'polling'],
+    engineio_logger=False,
+    socketio_logger=False,
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=10000000  # 10MB for large images
+)
+
+# Handle preflight requests
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "*")
+        response.headers.add('Access-Control-Allow-Methods', "*")
+        return response
+
 
 # Initialize frame processor
 frame_processor = FrameProcessor()
@@ -22,7 +49,7 @@ game_engine = GameEngine()
 @app.route("/test", methods=["GET"])
 def test_interface():
     """Render test interface for backend testing"""
-    return render_template("test.html")
+    return render_template("index2.html")
 
 
 @app.route("/", methods=["GET"])
@@ -82,8 +109,18 @@ def handle_frame_data(data):
             frame_processor.process_frame(image, frame_metadata=game_data)
         )
 
-        # Send real-time result immediately
-        emit("real_time_result", real_time_result)
+        if status == "success":
+            emit("real_time_result", real_time_result)
+        else:
+            # Send status update for non-success cases
+            emit("real_time_result", {
+                "status": status,
+                "prediction": status,
+                "confidence": 0.0,
+                "message": real_time_result.get("message", "Hand detection failed"),
+                "timestamp": real_time_result.get("timestamp", time.time())
+            })
+      
 
         # Send final result if ready
         if should_send_final and final_result:
