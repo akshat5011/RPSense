@@ -123,7 +123,7 @@ def run_with_ngrok():
     ngrok.kill()
 
     port = Config.PORT
-    public_url = ngrok.connect(port)
+    public_url = ngrok.connect(port, bind_tls=True)
 
     print("=" * 50)
     print("🚀 RPSense WebSocket Server Starting...")
