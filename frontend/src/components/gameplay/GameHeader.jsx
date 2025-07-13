@@ -4,7 +4,7 @@ const GameHeader = ({ navigateTo, gameInfo, gameMode }) => {
   return (
     <div className="flex items-center justify-between px-8 py-4">
       <div
-        onClick={() => navigateTo("menu")}
+        onClick={navigateTo}
         className="
           text-lg font-semibold py-2 px-4 cursor-pointer
           text-purple-400 hover:text-purple-300 

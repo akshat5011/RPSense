@@ -1,26 +1,29 @@
 import React from "react";
 import CameraView from "./ui/CameraView";
 import StatusIndicator from "./ui/StatusIndicator";
-import CaptureButton from "./ui/CaptureButton";
 
 const PlayerCameraSection = ({
   videoRef,
   cameraStream,
   isCapturing,
-  onToggleCapture,
+  overlayImage,
+  realtimeResult,
 }) => {
   return (
     <div className="flex flex-col">
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold text-cyan-400 mb-2">Your Move</h2>
         <p className="text-slate-300 text-sm">
-          Show your hand gesture to the camera
+          {isCapturing
+            ? "Show your hand gesture now!"
+            : "Get ready to show your hand gesture"}
         </p>
       </div>
 
       <div className="relative flex-1 rounded-lg border-2 border-cyan-500/30 bg-slate-900/50 overflow-hidden">
         <CameraView videoRef={videoRef} />
 
+        {/* Camera Status */}
         <StatusIndicator
           isActive={cameraStream}
           label={cameraStream ? "Camera Active" : "No Camera"}
@@ -28,11 +31,57 @@ const PlayerCameraSection = ({
           position="top-left"
         />
 
-        <CaptureButton
-          isCapturing={isCapturing}
-          onToggle={onToggleCapture}
-          disabled={!cameraStream}
-        />
+        {/* Capture Status */}
+        {isCapturing && (
+          <StatusIndicator
+            isActive={true}
+            label="Capturing..."
+            type="ai"
+            position="top-right"
+          />
+        )}
+
+        {/* Real-time Prediction Display */}
+        {realtimeResult &&
+          realtimeResult.prediction &&
+          realtimeResult.prediction !== "invalid" && (
+            <div className="absolute top-16 left-4 bg-black/70 rounded-lg p-2">
+              <div className="text-cyan-400 text-sm font-medium">
+                Prediction: {realtimeResult.prediction.toUpperCase()}
+              </div>
+              <div className="text-white text-xs">
+                Confidence: {(realtimeResult.confidence * 100).toFixed(1)}%
+              </div>
+            </div>
+          )}
+
+        {/* Small Overlay Image Thumbnail */}
+        {overlayImage && isCapturing && (
+          <div className="absolute bottom-4 right-4">
+            <img
+              src={overlayImage}
+              alt="Real-time overlay"
+              className="w-24 h-18 object-cover rounded border-2 border-cyan-400 opacity-80"
+            />
+            <div className="absolute -top-6 right-0 text-xs text-cyan-400 font-medium">
+              AI View
+            </div>
+          </div>
+        )}
+
+        {/* Capture Progress Indicator */}
+        {isCapturing && (
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+            <div className="bg-black/70 rounded-full px-3 py-1">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-white text-sm font-medium">
+                  Recording
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
