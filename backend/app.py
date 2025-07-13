@@ -8,6 +8,8 @@ from utils.config import Config
 from utils.image_utils import decode_frame_from_base64
 from services.frame_processor import FrameProcessor
 from flask_socketio import SocketIO, emit
+from services.game_engine import GameEngine
+
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -16,6 +18,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Initialize frame processor
 frame_processor = FrameProcessor()
+# Initialize game engine
+game_engine = GameEngine()
 
 
 @app.route('/test', methods=['GET'])
@@ -70,9 +74,15 @@ def gameplay():
         response_data = {"real_time": real_time_result}
 
         if should_send_final and final_result:
+            # Get player move from final result
+            player_move = final_result['final_prediction']
+            
+            # Only play if valid move (not 'invalid')
+            if player_move in ['rock', 'paper', 'scissors']:
+                game_result = game_engine.play_round(player_move)
+                final_result['game_result'] = game_result
+            
             response_data["final_result"] = final_result
-
-        return jsonify(response_data)
 
     except Exception as e:
         print(f"Error processing gameplay request: {str(e)}")
