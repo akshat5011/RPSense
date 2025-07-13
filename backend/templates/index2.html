@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPSense WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e293b, #3730a3);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #475569;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        button {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0284c7;
+        }
+        button:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .connected { background: #10b981; }
+        .disconnected { background: #ef4444; }
+        #video {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            border: 2px solid #0ea5e9;
+        }
+        #canvas {
+            display: none;
+        }
+        .log-area {
+            background: #0f172a;
+            border-radius: 5px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #334155;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        .log-info { color: #22d3ee; }
+        .log-success { color: #10b981; }
+        .log-error { color: #ef4444; }
+        .log-warning { color: #f59e0b; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .image-display {
+            max-width: 200px;
+            border-radius: 5px;
+            border: 1px solid #475569;
+        }
+        .prediction-display {
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid #06b6d4;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 RPSense WebSocket Test Interface</h1>
+            <p>Test the Rock Paper Scissors ML Server WebSocket Connection</p>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="section">
+            <h3>Connection Status</h3>
+            <div class="controls">
+                <span id="connection-status">
+                    <span class="status-indicator disconnected"></span>
+                    Disconnected
+                </span>
+                <button id="connect-btn" onclick="connectSocket()">Connect</button>
+                <button id="disconnect-btn" onclick="disconnectSocket()" disabled>Disconnect</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Camera Section -->
+            <div class="section">
+                <h3>📹 Camera Test</h3>
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="canvas"></canvas>
+                <div class="controls">
+                    <button onclick="startCamera()">Start Camera</button>
+                    <button onclick="stopCamera()">Stop Camera</button>
+                </div>
+            </div>
+
+            <!-- Game Controls -->
+            <div class="section">
+                <h3>🎮 Game Controls</h3>
+                <div class="controls">
+                    <button onclick="startGame()" id="start-game-btn" disabled>Start Game</button>
+                    <button onclick="stopGame()" id="stop-game-btn" disabled>Stop Game</button>
+                    <button onclick="startCapture()" id="start-capture-btn" disabled>Start Capture (2s)</button>
+                    <button onclick="stopCapture()" id="stop-capture-btn" disabled>Stop Capture</button>
+                </div>
+                
+                <!-- Current Prediction Display -->
+                <div id="prediction-display" class="prediction-display" style="display: none;">
+                    <h4>Current Prediction:</h4>
+                    <div id="prediction-text"></div>
+                    <div id="confidence-text"></div>
+                </div>
+
+                <!-- Final Result Display -->
+                <div id="final-result" style="display: none;">
+                    <h4>Final Result:</h4>
+                    <div id="final-text"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Display -->
+        <div class="section">
+            <h3>🖼️ AI Overlay Images</h3>
+            <div class="grid">
+                <div>
+                    <h4>Real-time Overlay:</h4>
+                    <img id="realtime-image" class="image-display" style="display: none;" />
+                    <div id="no-realtime">No real-time image</div>
+                </div>
+                <div>
+                    <h4>Final Overlay:</h4>
+                    <img id="final-image" class="image-display" style="display: none;" />
+                    <div id="no-final">No final image</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Log -->
+        <div class="section">
+            <h3>📋 Event Log</h3>
+            <button onclick="clearLog()">Clear Log</button>
+            <div id="log" class="log-area"></div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let video = null;
+        let canvas = null;
+        let ctx = null;
+        let stream = null;
+        let captureInterval = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            
+            // Auto-connect on load
+            connectSocket();
+        });
+
+        // Socket Management
+        function connectSocket() {
+            const serverUrl = window.location.origin;
+            logMessage(`Connecting to ${serverUrl}...`, 'info');
+            
+            socket = io(serverUrl);
+            
+            socket.on('connect', () => {
+                updateConnectionStatus(true);
+                logMessage('Socket connected successfully!', 'success');
+            });
+            
+            socket.on('disconnect', () => {
+                updateConnectionStatus(false);
+                logMessage('Socket disconnected', 'warning');
+            });
+            
+            socket.on('connected', (data) => {
+                logMessage(`Server says: ${data.message}`, 'success');
+            });
+            
+            socket.on('real_time_result', (data) => {
+                logMessage(`Real-time: ${data.prediction} (${(data.confidence * 100).toFixed(1)}%)`, 'info');
+                updatePredictionDisplay(data);
+                
+                if (data.overlay_image) {
+                    document.getElementById('realtime-image').src = data.overlay_image;
+                    document.getElementById('realtime-image').style.display = 'block';
+                    document.getElementById('no-realtime').style.display = 'none';
+                }
+            });
+            
+            socket.on('final_result', (data) => {
+                logMessage(`Final result: ${data.final_prediction} (${(data.confidence * 100).toFixed(1)}%)`, 'success');
+                updateFinalResult(data);
+                
+                if (data.final_overlay_image) {
+                    document.getElementById('final-image').src = data.final_overlay_image;
+                    document.getElementById('final-image').style.display = 'block';
+                    document.getElementById('no-final').style.display = 'none';
+                }
+                
+                // Stop capture automatically
+                stopCapture();
+            });
+            
+            socket.on('game_started', (data) => {
+                logMessage(`Game started: ${JSON.stringify(data)}`, 'success');
+            });
+            
+            socket.on('game_stopped', (data) => {
+                logMessage(`Game stopped: ${data.message}`, 'warning');
+            });
+            
+            socket.on('error', (data) => {
+                logMessage(`Error: ${data.message}`, 'error');
+            });
+        }
+
+        function disconnectSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connection-status');
+            const connectBtn = document.getElementById('connect-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            const gameButtons = ['start-game-btn', 'stop-game-btn', 'start-capture-btn'];
+            
+            if (connected) {
+                statusElement.innerHTML = '<span class="status-indicator connected"></span>Connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                gameButtons.forEach(id => document.getElementById(id).disabled = false);
+            } else {
+                statusElement.innerHTML = '<span class="status-indicator disconnected"></span>Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                gameButtons.forEach(id => document.getElementById(id).disabled = true);
+            }
+        }
+
+        // Camera Management
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = stream;
+                logMessage('Camera started successfully', 'success');
+            } catch (error) {
+                logMessage(`Camera error: ${error.message}`, 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                video.srcObject = null;
+                logMessage('Camera stopped', 'warning');
+            }
+        }
+
+        // Game Controls
+        function startGame() {
+            if (!socket) return;
+            
+            const gameData = {
+                gameMode: 'test',
+                totalRounds: 1,
+                currentRound: 1,
+                playerName: 'Test Player'
+            };
+            
+            socket.emit('start_game', gameData);
+            logMessage('Sent start_game event', 'info');
+        }
+
+        function stopGame() {
+            if (!socket) return;
+            
+            socket.emit('stop_game');
+            logMessage('Sent stop_game event', 'info');
+            stopCapture();
+        }
+
+        function startCapture() {
+            if (!socket || !video.srcObject) {
+                logMessage('Cannot start capture: No socket or camera', 'error');
+                return;
+            }
+            
+            document.getElementById('start-capture-btn').disabled = true;
+            document.getElementById('stop-capture-btn').disabled = false;
+            
+            logMessage('Starting frame capture (10fps for 2 seconds)...', 'info');
+            
+            // Capture at 10fps
+            captureInterval = setInterval(sendFrame, 100);
+            
+            // Auto-stop after 2 seconds
+            setTimeout(() => {
+                if (captureInterval) {
+                    stopCapture();
+                    logMessage('Auto-stopped capture after 2 seconds', 'info');
+                }
+            }, 2000);
+        }
+
+        function stopCapture() {
+            if (captureInterval) {
+                clearInterval(captureInterval);
+                captureInterval = null;
+                
+                document.getElementById('start-capture-btn').disabled = false;
+                document.getElementById('stop-capture-btn').disabled = true;
+                
+                logMessage('Frame capture stopped', 'warning');
+            }
+        }
+
+        function sendFrame() {
+            if (!video || !canvas || !socket) return;
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            const frameData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            const data = {
+                frame: frameData,
+                gameData: {
+                    gameMode: 'test',
+                    totalRounds: 1,
+                    currentRound: 1,
+                    timestamp: Date.now()
+                }
+            };
+            
+            socket.emit('frame_data', data);
+        }
+
+        // UI Updates
+        function updatePredictionDisplay(data) {
+            const display = document.getElementById('prediction-display');
+            const predText = document.getElementById('prediction-text');
+            const confText = document.getElementById('confidence-text');
+            
+            predText.textContent = `Prediction: ${data.prediction?.toUpperCase() || 'Unknown'}`;
+            confText.textContent = `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+            display.style.display = 'block';
+        }
+
+        function updateFinalResult(data) {
+            const display = document.getElementById('final-result');
+            const finalText = document.getElementById('final-text');
+            
+            let resultText = `Player: ${data.final_prediction?.toUpperCase()}`;
+            
+            if (data.game_result) {
+                resultText += `\nComputer: ${data.game_result.computer_move?.toUpperCase()}`;
+                resultText += `\nWinner: ${data.game_result.winner?.toUpperCase()}`;
+            }
+            
+            finalText.style.whiteSpace = 'pre-line';
+            finalText.textContent = resultText;
+            display.style.display = 'block';
+        }
+
+        // Logging
+        function logMessage(message, type = 'info') {
+            const log = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopCapture();
+            stopCamera();
+            if (socket) {
+                socket.disconnect();
+            }
+        });
+    </script>
+</body>
+</html>
