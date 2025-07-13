@@ -48,18 +48,21 @@ const ActivePlay = ({ navigateTo }) => {
   const [finalResult, setFinalResult] = useState(null);
   const [overlayImage, setOverlayImage] = useState(null);
 
-  const ML_SERVER = process.env.NEXT_PUBLIC_ML_SERVER || "http://localhost:5000";
+  const [socketConnected, setSocketConnected] = useState(false);
+
+  const ML_SERVER =
+    process.env.NEXT_PUBLIC_ML_SERVER || "http://localhost:5000";
 
   // Initialize Socket.IO connection
   const initSocket = () => {
     socketRef.current = io(ML_SERVER);
 
     socketRef.current.on("connected", (data) => {
-      console.log("Connected to ML server:", data);
+      console.log("✅ Connected to ML server:", data);
     });
 
     socketRef.current.on("real_time_result", (data) => {
-      console.log("Real-time result:", data);
+      console.log("📊 Real-time result:", data);
       setRealtimeResult(data);
 
       // Show small overlay image if available
@@ -69,7 +72,7 @@ const ActivePlay = ({ navigateTo }) => {
     });
 
     socketRef.current.on("final_result", (data) => {
-      console.log("Final result:", data);
+      console.log("🎯 Final result:", data);
       setFinalResult(data);
 
       // Stop capturing frames
@@ -97,8 +100,28 @@ const ActivePlay = ({ navigateTo }) => {
       }, 3000);
     });
 
+    // Add missing event listeners
+    socketRef.current.on("game_started", (data) => {
+      console.log("🎮 Game started:", data);
+    });
+
+    socketRef.current.on("game_stopped", (data) => {
+      console.log("🛑 Game stopped:", data);
+    });
+
     socketRef.current.on("error", (data) => {
-      console.error("Socket error:", data);
+      console.error("❌ Socket error:", data);
+    });
+
+    // Add connection status tracking
+    socketRef.current.on("connect", () => {
+      console.log("🔌 Socket connected");
+      setSocketConnected(true);
+    });
+
+    socketRef.current.on("disconnect", () => {
+      console.log("🔌 Socket disconnected");
+      setSocketConnected(false);
     });
   };
 
@@ -396,7 +419,7 @@ const ActivePlay = ({ navigateTo }) => {
         isCapturing={gameState === "capturing"}
         cameraStream={cameraStream}
         gameState={gameState}
-        socketConnected={socketRef.current?.connected}
+        socketConnected={socketConnected} // Use state instead of socketRef.current?.connected
       />
 
       <NeonEffects />
