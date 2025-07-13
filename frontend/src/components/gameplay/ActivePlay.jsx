@@ -48,7 +48,7 @@ const ActivePlay = ({ navigateTo }) => {
   const [finalResult, setFinalResult] = useState(null);
   const [overlayImage, setOverlayImage] = useState(null);
 
-  const ML_SERVER = process.env.REACT_APP_ML_SERVER || "http://localhost:5000";
+  const ML_SERVER = process.env.NEXT_PUBLIC_ML_SERVER || "http://localhost:5000";
 
   // Initialize Socket.IO connection
   const initSocket = () => {
