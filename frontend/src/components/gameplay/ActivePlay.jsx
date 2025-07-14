@@ -175,6 +175,8 @@ const ActivePlay = ({ navigateTo }) => {
 
       // Show result and handle round completion
       setGameState("result");
+
+      // Use a longer delay to ensure state updates are complete
       setTimeout(() => {
         handleRoundCompletion();
       }, 3000);
@@ -194,6 +196,24 @@ const ActivePlay = ({ navigateTo }) => {
         handleSocketError();
       }
     });
+
+    // Connection timeout handling
+    socketRef.current.on("connect_error", (error) => {
+      console.error("❌ Connection error:", error.message);
+      setSocketConnected(false);
+
+      // If we're capturing and get connection error, handle it
+      if (isCapturing && !resultReceivedRef.current) {
+        handleSocketError();
+      }
+
+      // Try switching transport on error
+      if (error.type === "TransportError") {
+        console.log("🔄 Switching to polling transport...");
+        socketRef.current.io.opts.transports = ["polling"];
+      }
+    });
+
   };
 
   // Stop capturing frames
@@ -348,7 +368,6 @@ const ActivePlay = ({ navigateTo }) => {
       playerName: currentPlayer?.name || "Player",
     });
 
-    // Use more stable frame timing
     let frameCount = 0;
     const maxFrames = 20; // 2 seconds at 10fps
 
@@ -357,18 +376,8 @@ const ActivePlay = ({ navigateTo }) => {
         sendFrameToSocket();
         frameCount++;
       } else {
-        // Stop capturing after 2 seconds or when result received
+        // Stop capturing after 2 seconds
         stopCapturing();
-
-        // If no result received after 2 seconds, force timeout
-        if (!resultReceivedRef.current) {
-          console.log("⏰ Capture timeout - no result received");
-          setTimeout(() => {
-            if (!resultReceivedRef.current) {
-              handleSocketError();
-            }
-          }, 1000); // Wait 1 more second for result
-        }
       }
     }, 100);
   };

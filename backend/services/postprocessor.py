@@ -1,7 +1,7 @@
 from collections import Counter, defaultdict
 import numpy as np
 from utils.config import Config
-
+import time
 
 class PredictionPostprocessor:
     def __init__(self):
@@ -74,5 +74,21 @@ class PredictionPostprocessor:
         self.frame_buffer.clear()
 
     def should_send_final_result(self):
-        """Check if we have enough frames to send a final result"""
-        return len(self.frame_buffer) >= self.max_frames * 0.8  # 80% of expected frames
+        """Check if we have enough frames OR timeout reached"""
+        has_enough_frames = len(self.frame_buffer) >= self.max_frames * 0.8
+        
+        # Also check if we have any frames and enough time has passed
+        if self.frame_buffer:
+            oldest_frame_time = self.frame_buffer[0]["timestamp"]
+            if oldest_frame_time is None:
+                return has_enough_frames
+            try:
+                time_elapsed = time.time() - oldest_frame_time
+                has_timeout = time_elapsed >= 2.5  # 2.5 seconds timeout
+                
+                return has_enough_frames or (len(self.frame_buffer) >= 3 and has_timeout)
+            except (TypeError, ValueError):
+                # If timestamp is invalid, fall back to frame count only
+                return has_enough_frames
+        
+        return False

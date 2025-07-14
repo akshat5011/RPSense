@@ -40,19 +40,21 @@ class HandDetector:
             # Single hand detected - normalize landmarks with image dimensions
             hand_landmarks = results.multi_hand_landmarks[0]
             
-            # Convert normalized landmarks to pixel coordinates
-            landmark_coords = []
-            for landmark in hand_landmarks.landmark:
-                x = int(landmark.x * width)
-                y = int(landmark.y * height)
-                z = landmark.z
-                landmark_coords.append([x, y, z])
+            # # Convert normalized landmarks to pixel coordinates
+            # landmark_coords = []
+            # for landmark in hand_landmarks.landmark:
+            #     x = int(landmark.x * width)
+            #     y = int(landmark.y * height)
+            #     z = landmark.z
+            #     landmark_coords.append([x, y, z])
 
-            return "success", "Single hand detected", {
-                'landmarks': hand_landmarks,
-                'coordinates': landmark_coords,
-                'image_dims': (width, height)
-            }
+            return "success", "Single hand detected", hand_landmarks
+
+            # return "success", "Single hand detected", {
+            #     'landmarks': hand_landmarks,
+            #     'coordinates': landmark_coords,
+            #     'image_dims': (width, height)
+            # }
         except Exception as e:
             return "error", f"Hand detection error: {str(e)}", None
 

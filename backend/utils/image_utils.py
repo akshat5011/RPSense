@@ -42,13 +42,17 @@ def encode_frame_to_base64(img):
 
 def extract_hand_roi(image, hand_landmarks, padding=20):
     """Extract hand region of interest from image using MediaPipe landmarks"""
-    if hand_landmarks is None or len(hand_landmarks.landmark) == 0:
+    if isinstance(hand_landmarks, dict):
+        landmarks = hand_landmarks['landmarks']
+    else:
+        landmarks = hand_landmarks
+    if landmarks is None or len(landmarks.landmark) == 0:
         return None, None
 
     h, w, _ = image.shape
 
-    x_coords = [landmark.x * w for landmark in hand_landmarks.landmark]
-    y_coords = [landmark.y * h for landmark in hand_landmarks.landmark]
+    x_coords = [landmark.x * w for landmark in landmarks.landmark]
+    y_coords = [landmark.y * h for landmark in landmarks.landmark]
 
     x_min = max(0, int(min(x_coords)) - padding)
     x_max = min(w, int(max(x_coords)) + padding)

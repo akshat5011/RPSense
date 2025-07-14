@@ -25,9 +25,7 @@ class FrameProcessor:
         timestamp = time.time()
 
         # 1. Hand Detection
-        hand_status, hand_message, hand_landmarks = self.hand_detector.detect_hands(
-            image
-        )
+        hand_status, hand_message, hand_data = self.hand_detector.detect_hands(image)   
 
         if hand_status != "success":
             return (
@@ -35,6 +33,8 @@ class FrameProcessor:
                 {
                     "status": hand_status,
                     "message": hand_message,
+                    "prediction": "invalid",
+                    "confidence": 0.0,
                     "timestamp": timestamp,
                 },
                 False,
@@ -43,7 +43,7 @@ class FrameProcessor:
 
         try:
             # 2. Extract hand ROI
-            roi_image, bbox = extract_hand_roi(image, hand_landmarks)
+            roi_image, bbox = extract_hand_roi(image, hand_data)
 
             # 3. Preprocess for model
             preprocessed_roi = self.preprocessor.preprocess_for_model(roi_image)
@@ -127,7 +127,7 @@ class FrameProcessor:
                     }
 
                     # Clear buffer after sending final result
-                    self.postprocessor.clear_buffer()
+                self.postprocessor.clear_buffer()
 
             return "success", real_time_result, should_send_final, final_result
 

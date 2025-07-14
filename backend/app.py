@@ -5,9 +5,11 @@ from datetime import datetime
 from utils.config import Config
 from utils.image_utils import decode_frame_from_base64
 from services.frame_processor import FrameProcessor
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, request
 from services.game_engine import GameEngine
 import time
+import threading
+from threading import Timer
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -36,6 +38,9 @@ socketio = SocketIO(
     max_http_buffer_size=10000000,  # 10MB for large images
 )
 
+frame_start_times = {}
+client_timers = {}  # Store timers for each client
+
 
 # Handle preflight requests
 @app.before_request
@@ -52,6 +57,32 @@ def handle_preflight():
 frame_processor = FrameProcessor()
 # Initialize game engine
 game_engine = GameEngine()
+
+
+def handle_client_timeout(client_id):
+    """Handle timeout for a specific client"""
+    print(f"⏰ Client {client_id} timeout - sending default result")
+
+    if client_id in frame_start_times:
+        del frame_start_times[client_id]
+
+    if client_id in client_timers:
+        del client_timers[client_id]
+
+    # Send timeout result
+    timeout_result = {
+        "status": "timeout",
+        "final_prediction": "timeout",
+        "confidence": 0.0,
+        "message": "Processing timeout - Computer wins",
+        "timestamp": time.time(),
+        "game_result": game_engine.play_round("timeout"),
+    }
+
+    try:
+        socketio.emit("final_result", timeout_result, room=client_id)
+    except Exception as e:
+        print(f"⚠️ Failed to send timeout result to {client_id}: {e}")
 
 
 @app.route("/test", methods=["GET"])
@@ -91,12 +122,36 @@ def handle_connect():
 @socketio.on("disconnect")
 def handle_disconnect():
     print("🔌 Client disconnected")
+    client_id = request.sid
+
+    # Clean up timing data for this client
+    if client_id in frame_start_times:
+        del frame_start_times[client_id]
+
+    # Cancel timeout timer
+    if client_id in client_timers:
+        client_timers[client_id].cancel()
+        del client_timers[client_id]
+
+
+# In app.py, fix the timeout logic:
 
 
 @socketio.on("frame_data")
 def handle_frame_data(data):
     """Handle incoming frame data via WebSocket"""
     try:
+        # Track frame processing start time per client
+        client_id = request.sid
+        current_time = time.time()
+
+        # Initialize or update frame timing
+        if client_id not in frame_start_times:
+            frame_start_times[client_id] = current_time
+
+        # Update last frame time for this client
+        frame_start_times[client_id] = current_time
+
         # Extract frame and game data
         frame_base64 = data.get("frame")
         game_data = data.get("gameData", {})
@@ -133,27 +188,45 @@ def handle_frame_data(data):
 
         # Send final result if ready
         if should_send_final:
+            client_id = request.sid
+
+            # Cancel timeout timer since we're sending result
+            if client_id in client_timers:
+                client_timers[client_id].cancel()
+                del client_timers[client_id]
+
+            # Clear timing for this client
+            if client_id in frame_start_times:
+                del frame_start_times[client_id]
+
             if final_result:
                 player_move = final_result["final_prediction"]
+                game_result = game_engine.play_round(player_move)
+                final_result["game_result"] = game_result
+                emit("final_result", final_result)
             else:
-                # No valid result - create invalid move
-                player_move = "invalid"
-                final_result = {
+                # Handle case when should_send_final=True but no final_result
+                invalid_result = {
                     "status": "invalid",
                     "final_prediction": "invalid",
                     "confidence": 0.0,
                     "message": "No valid gesture detected",
                     "timestamp": time.time(),
+                    "game_result": game_engine.play_round("invalid"),
                 }
-
-            # Play round - computer wins for invalid moves
-            game_result = game_engine.play_round(player_move)
-            final_result["game_result"] = game_result
-
-            emit("final_result", final_result)
+                emit("final_result", invalid_result)
 
     except Exception as e:
         print(f"❌ WebSocket frame processing error: {str(e)}")
+
+        # Clear timing on error
+        client_id = request.sid
+        if client_id in frame_start_times:
+            del frame_start_times[client_id]
+        if client_id in client_timers:
+            client_timers[client_id].cancel()
+            del client_timers[client_id]
+
         # Create error result where computer wins
         error_result = {
             "status": "error",
@@ -170,6 +243,26 @@ def handle_frame_data(data):
 def handle_start_game(data):
     """Handle game start event"""
     print(f"🎮 Game started with data: {data}")
+
+    client_id = request.sid
+
+    # Clear any existing timing data for this client
+    if client_id in frame_start_times:
+        del frame_start_times[client_id]
+
+    # Cancel any existing timer
+    if client_id in client_timers:
+        client_timers[client_id].cancel()
+        del client_timers[client_id]
+
+    # Clear frame processor buffer for fresh start
+    frame_processor.postprocessor.clear_buffer()
+
+    # Start timeout timer (4 seconds to allow for frame processing)
+    timer = Timer(4.0, handle_client_timeout, args=[client_id])
+    timer.start()
+    client_timers[client_id] = timer
+
     emit("game_started", {"message": "Game session started!", "data": data})
 
 
@@ -177,8 +270,19 @@ def handle_start_game(data):
 def handle_stop_game():
     """Handle game stop event"""
     print("🛑 Game stopped")
+
+    # Clear timing data for this client
+    client_id = request.sid
+    if client_id in frame_start_times:
+        del frame_start_times[client_id]
+
+    if client_id in client_timers:
+        client_timers[client_id].cancel()
+        del client_timers[client_id]
+
     # Clear frame processor buffer
     frame_processor.postprocessor.clear_buffer()
+
     emit("game_stopped", {"message": "Game session ended!"})
 
 
