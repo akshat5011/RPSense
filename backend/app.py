@@ -11,23 +11,31 @@ import time
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, 
-     origins="*",
-     allow_headers=["Content-Type", "Authorization", "ngrok-skip-browser-warning", "Origin"],
-     methods=["GET", "POST", "OPTIONS"],
-     supports_credentials=True)
+CORS(
+    app,
+    origins="*",
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "ngrok-skip-browser-warning",
+        "Origin",
+    ],
+    methods=["GET", "POST", "OPTIONS"],
+    supports_credentials=True,
+)
 
 socketio = SocketIO(
-    app, 
+    app,
     cors_allowed_origins="*",
     allow_upgrades=True,
-    transports=['websocket', 'polling'],
+    transports=["websocket", "polling"],
     engineio_logger=False,
     socketio_logger=False,
     ping_timeout=60,
     ping_interval=25,
-    max_http_buffer_size=10000000  # 10MB for large images
+    max_http_buffer_size=10000000,  # 10MB for large images
 )
+
 
 # Handle preflight requests
 @app.before_request
@@ -35,8 +43,8 @@ def handle_preflight():
     if request.method == "OPTIONS":
         response = jsonify({"status": "ok"})
         response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add('Access-Control-Allow-Headers', "*")
-        response.headers.add('Access-Control-Allow-Methods', "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
         return response
 
 
@@ -99,7 +107,6 @@ def handle_frame_data(data):
             return
 
         image = decode_frame_from_base64(frame_base64)
-
         if image is None:
             emit("error", {"message": "Invalid image format"})
             return
@@ -109,34 +116,54 @@ def handle_frame_data(data):
             frame_processor.process_frame(image, frame_metadata=game_data)
         )
 
+        # Always emit real-time result
         if status == "success":
             emit("real_time_result", real_time_result)
         else:
-            # Send status update for non-success cases
-            emit("real_time_result", {
-                "status": status,
-                "prediction": status,
-                "confidence": 0.0,
-                "message": real_time_result.get("message", "Hand detection failed"),
-                "timestamp": real_time_result.get("timestamp", time.time())
-            })
-      
+            emit(
+                "real_time_result",
+                {
+                    "status": status,
+                    "prediction": "invalid",
+                    "confidence": 0.0,
+                    "message": real_time_result.get("message", "Hand detection failed"),
+                    "timestamp": real_time_result.get("timestamp", time.time()),
+                },
+            )
 
         # Send final result if ready
-        if should_send_final and final_result:
-            # Get player move from final result
-            player_move = final_result["final_prediction"]
+        if should_send_final:
+            if final_result:
+                player_move = final_result["final_prediction"]
+            else:
+                # No valid result - create invalid move
+                player_move = "invalid"
+                final_result = {
+                    "status": "invalid",
+                    "final_prediction": "invalid",
+                    "confidence": 0.0,
+                    "message": "No valid gesture detected",
+                    "timestamp": time.time(),
+                }
 
-            # Only play if valid move (not 'invalid')
-            if player_move in ["rock", "paper", "scissors"]:
-                game_result = game_engine.play_round(player_move)
-                final_result["game_result"] = game_result
+            # Play round - computer wins for invalid moves
+            game_result = game_engine.play_round(player_move)
+            final_result["game_result"] = game_result
 
             emit("final_result", final_result)
 
     except Exception as e:
         print(f"❌ WebSocket frame processing error: {str(e)}")
-        emit("error", {"message": f"Processing failed: {str(e)}"})
+        # Create error result where computer wins
+        error_result = {
+            "status": "error",
+            "final_prediction": "error",
+            "confidence": 0.0,
+            "message": f"Processing failed: {str(e)}",
+            "timestamp": time.time(),
+            "game_result": game_engine.play_round("error"),
+        }
+        emit("final_result", error_result)
 
 
 @socketio.on("start_game")

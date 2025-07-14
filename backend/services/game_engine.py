@@ -30,6 +30,10 @@ class GameEngine:
         Returns:
             str: 'player', 'computer', or 'tie'
         """
+        # If player move is invalid, computer wins by default
+        if player_move not in self.moves:
+            return 'computer'
+            
         if player_move == computer_move:
             return 'tie'
         elif self.rules[player_move] == computer_move:
@@ -41,17 +45,25 @@ class GameEngine:
         """
         Play a complete round of RPS
         Args:
-            player_move (str): Player's move (rock, paper, scissors)
+            player_move (str): Player's move (rock, paper, scissors, or invalid)
         Returns:
             dict: {
                 'computer_move': str,
-                'winner': str
+                'winner': str,
+                'player_move': str,
+                'valid_move': bool
             }
         """
         computer_move = self.generate_computer_move()
         winner = self.determine_winner(player_move, computer_move)
         
+        # Check if player move was valid
+        valid_move = player_move in self.moves
+        
         return {
             'computer_move': computer_move,
-            'winner': winner
+            'player_move': player_move,
+            'winner': winner,
+            'valid_move': valid_move,
+            'reason': 'Invalid move - Computer wins!' if not valid_move else None
         }
