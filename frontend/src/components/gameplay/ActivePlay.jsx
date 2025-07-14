@@ -28,6 +28,7 @@ const ActivePlay = ({ navigateTo }) => {
   const canvasRef = useRef(null);
   const socketRef = useRef(null);
   const frameIntervalRef = useRef(null);
+  const resultReceivedRef = useRef(false); // Prevent multiple final results
 
   // Redux state
   const gameMode = useSelector(selectGameMode);
@@ -42,12 +43,12 @@ const ActivePlay = ({ navigateTo }) => {
   const [computerChoice, setComputerChoice] = useState("🤖");
   const [playerScore, setPlayerScore] = useState(0);
   const [computerScore, setComputerScore] = useState(0);
+  const [isCapturing, setIsCapturing] = useState(false); // Track capturing state
 
   // ML Results
   const [realtimeResult, setRealtimeResult] = useState(null);
   const [finalResult, setFinalResult] = useState(null);
   const [overlayImage, setOverlayImage] = useState(null);
-
   const [socketConnected, setSocketConnected] = useState(false);
 
   const ML_SERVER =
@@ -55,6 +56,10 @@ const ActivePlay = ({ navigateTo }) => {
 
   // Initialize Socket.IO connection
   const initSocket = () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+
     console.log("🔍 Connecting to:", ML_SERVER);
 
     socketRef.current = io(ML_SERVER, {
@@ -94,6 +99,7 @@ const ActivePlay = ({ navigateTo }) => {
       timestampRequests: false,
     });
 
+    // Connection handlers
     socketRef.current.on("connect", () => {
       console.log("✅ Socket connected successfully!");
       console.log("✅ Transport:", socketRef.current.io.engine.transport.name);
@@ -101,10 +107,24 @@ const ActivePlay = ({ navigateTo }) => {
       setSocketConnected(true);
     });
 
+    socketRef.current.on("disconnect", (reason) => {
+      console.log("🔌 Socket disconnected:", reason);
+      setSocketConnected(false);
+
+      // Handle unexpected disconnections
+      if (reason === "io server disconnect" || reason === "ping timeout") {
+        console.log("🔄 Attempting to reconnect...");
+        setTimeout(() => {
+          if (socketRef.current) {
+            socketRef.current.connect();
+          }
+        }, 2000);
+      }
+    });
+
     socketRef.current.on("connect_error", (error) => {
       console.error("❌ Connection error:", error.message);
-      console.error("Error type:", error.type);
-      console.error("Error description:", error.description);
+      setSocketConnected(false);
 
       // Try switching transport on error
       if (error.type === "TransportError") {
@@ -113,29 +133,39 @@ const ActivePlay = ({ navigateTo }) => {
       }
     });
 
+    // Game event handlers
     socketRef.current.on("connected", (data) => {
       console.log("✅ Connected to ML server:", data);
     });
 
     socketRef.current.on("real_time_result", (data) => {
       console.log("📊 Real-time result:", data);
-      setRealtimeResult(data);
 
-      // Show small overlay image if available
-      if (data.overlay_image) {
-        setOverlayImage(data.overlay_image);
+      // Only process if we haven't received final result yet
+      if (!resultReceivedRef.current) {
+        setRealtimeResult(data);
+
+        // Show small overlay image if available
+        if (data.overlay_image) {
+          setOverlayImage(data.overlay_image);
+        }
       }
     });
 
     socketRef.current.on("final_result", (data) => {
       console.log("🎯 Final result:", data);
+
+      // Prevent duplicate final results
+      if (resultReceivedRef.current) {
+        console.log("⚠️ Duplicate final result ignored");
+        return;
+      }
+
+      resultReceivedRef.current = true;
       setFinalResult(data);
 
-      // Stop capturing frames
-      if (frameIntervalRef.current) {
-        clearInterval(frameIntervalRef.current);
-        frameIntervalRef.current = null;
-      }
+      // Stop capturing immediately
+      stopCapturing();
 
       // Update computer choice and scores
       if (data.game_result) {
@@ -143,16 +173,10 @@ const ActivePlay = ({ navigateTo }) => {
         updateGameScore(data.game_result.winner);
       }
 
-      // Show result for 3 seconds then show next round button
+      // Show result and handle round completion
       setGameState("result");
       setTimeout(() => {
-        if (currentRound + 1 < rounds) {
-          setGameState("waiting");
-        } else {
-          // Game finished
-          setGameState("finished");
-          saveMatchData();
-        }
+        handleRoundCompletion();
       }, 3000);
     });
 
@@ -161,24 +185,99 @@ const ActivePlay = ({ navigateTo }) => {
       console.log("🎮 Game started:", data);
     });
 
-    socketRef.current.on("game_stopped", (data) => {
-      console.log("🛑 Game stopped:", data);
-    });
-
     socketRef.current.on("error", (data) => {
       console.error("❌ Socket error:", data);
-    });
 
-    // Add connection status tracking
-    socketRef.current.on("connect", () => {
-      console.log("🔌 Socket connected");
-      setSocketConnected(true);
+      // Force final result on error
+      if (isCapturing && !resultReceivedRef.current) {
+        console.log("🔄 Forcing result due to socket error");
+        handleSocketError();
+      }
     });
+  };
 
-    socketRef.current.on("disconnect", () => {
-      console.log("🔌 Socket disconnected");
-      setSocketConnected(false);
-    });
+  // Stop capturing frames
+  const stopCapturing = () => {
+    if (frameIntervalRef.current) {
+      clearInterval(frameIntervalRef.current);
+      frameIntervalRef.current = null;
+    }
+    setIsCapturing(false);
+    console.log("🛑 Stopped capturing frames");
+  };
+
+  // Handle round completion logic
+  const handleRoundCompletion = () => {
+    const isClassicMode = gameMode === "classic";
+    const isLastRound = currentRound + 1 >= rounds;
+
+    if (isClassicMode || isLastRound) {
+      // Game finished
+      setGameState("finished");
+      saveMatchData();
+
+      // Close socket connection
+      if (socketRef.current) {
+        socketRef.current.emit("stop_game");
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    } else {
+      // More rounds to play
+      setGameState("waiting");
+      clearRoundState();
+    }
+  };
+
+  // Clear state between rounds
+  const clearRoundState = () => {
+    setRealtimeResult(null);
+    setFinalResult(null);
+    setOverlayImage(null);
+    setComputerChoice("🤖");
+    resultReceivedRef.current = false;
+    setIsCapturing(false);
+
+    // Stop camera between rounds
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+
+    console.log("🧹 Round state cleared");
+  };
+
+  // Handle socket errors
+  const handleSocketError = () => {
+    stopCapturing();
+
+    if (!resultReceivedRef.current) {
+      resultReceivedRef.current = true;
+
+      // Create error result where computer wins
+      const errorResult = {
+        status: "error",
+        final_prediction: "error",
+        confidence: 0.0,
+        message: "Connection error - Computer wins",
+        game_result: {
+          computer_move: "rock",
+          player_move: "error",
+          winner: "computer",
+          valid_move: false,
+          reason: "Connection error",
+        },
+      };
+
+      setFinalResult(errorResult);
+      setComputerChoice("🗿");
+      updateGameScore("computer");
+
+      setGameState("result");
+      setTimeout(() => {
+        handleRoundCompletion();
+      }, 3000);
+    }
   };
 
   // Initialize camera
@@ -211,12 +310,9 @@ const ActivePlay = ({ navigateTo }) => {
       await initCamera();
     }
 
+    clearRoundState();
     setGameState("countdown");
     setCountdown(3);
-    setRealtimeResult(null);
-    setFinalResult(null);
-    setOverlayImage(null);
-    setComputerChoice("🤖");
 
     // Countdown timer
     const countdownTimer = setInterval(() => {
@@ -233,7 +329,15 @@ const ActivePlay = ({ navigateTo }) => {
 
   // Start capturing frames
   const startCapturing = () => {
+    if (!socketRef.current || !socketRef.current.connected) {
+      console.error("❌ Socket not connected, cannot start capturing");
+      handleSocketError();
+      return;
+    }
+
     setGameState("capturing");
+    setIsCapturing(true);
+    resultReceivedRef.current = false;
 
     // Send start_game event
     socketRef.current.emit("start_game", {
@@ -248,15 +352,26 @@ const ActivePlay = ({ navigateTo }) => {
     const maxFrames = 20; // 2 seconds at 10fps
 
     frameIntervalRef.current = setInterval(() => {
-      if (frameCount < maxFrames) {
+      if (frameCount < maxFrames && !resultReceivedRef.current) {
         sendFrameToSocket();
         frameCount++;
       } else {
-        clearInterval(frameIntervalRef.current);
-        frameIntervalRef.current = null;
+        // Stop capturing after 2 seconds or when result received
+        stopCapturing();
+
+        // If no result received after 2 seconds, force timeout
+        if (!resultReceivedRef.current) {
+          console.log("⏰ Capture timeout - no result received");
+          setTimeout(() => {
+            if (!resultReceivedRef.current) {
+              handleSocketError();
+            }
+          }, 1000); // Wait 1 more second for result
+        }
       }
-    }, 100); // 100ms = 10fps
+    }, 100);
   };
+
   // Send frame via socket
   const sendFrameToSocket = () => {
     if (!videoRef.current || !canvasRef.current || !socketRef.current) return;
@@ -288,7 +403,7 @@ const ActivePlay = ({ navigateTo }) => {
         playerScore,
         computerScore,
         timestamp: Date.now(),
-        frameId: Math.random().toString(36).substr(2, 9), // Unique frame ID
+        frameId: Math.random().toString(36).substr(2, 9),
       },
     });
   };
@@ -300,7 +415,7 @@ const ActivePlay = ({ navigateTo }) => {
       dispatch(updateScore({ player: 1, computer: 0 }));
     } else if (winner === "computer") {
       setComputerScore((prev) => prev + 1);
-      dispatch(updateScore({ player: -1, computer: 1 }));
+      dispatch(updateScore({ player: 0, computer: 1 }));
     }
     // Draw = no score change
   };
@@ -340,18 +455,14 @@ const ActivePlay = ({ navigateTo }) => {
   // Next round handler
   const handleNextRound = () => {
     dispatch(nextRound());
+    clearRoundState();
     setGameState("waiting");
-
-    // Pause camera between rounds
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
-    }
   };
 
   // Exit game handler
   const handleExitGame = () => {
-    // Stop camera
+    stopCapturing();
+
     if (cameraStream) {
       cameraStream.getTracks().forEach((track) => track.stop());
     }
@@ -360,17 +471,10 @@ const ActivePlay = ({ navigateTo }) => {
     if (socketRef.current) {
       socketRef.current.emit("stop_game");
       socketRef.current.disconnect();
+      socketRef.current = null;
     }
 
-    // Clear intervals
-    if (frameIntervalRef.current) {
-      clearInterval(frameIntervalRef.current);
-    }
-
-    // Reset game state
     dispatch(resetGame());
-
-    // Navigate to menu
     navigateTo("menu");
   };
 
@@ -379,15 +483,12 @@ const ActivePlay = ({ navigateTo }) => {
     initSocket();
 
     return () => {
-      // Cleanup on unmount
+      stopCapturing();
       if (cameraStream) {
         cameraStream.getTracks().forEach((track) => track.stop());
       }
       if (socketRef.current) {
         socketRef.current.disconnect();
-      }
-      if (frameIntervalRef.current) {
-        clearInterval(frameIntervalRef.current);
       }
     };
   }, []);
@@ -419,7 +520,7 @@ const ActivePlay = ({ navigateTo }) => {
         <PlayerCameraSection
           videoRef={videoRef}
           cameraStream={cameraStream}
-          isCapturing={gameState === "capturing"}
+          isCapturing={isCapturing} // Use local state instead of gameState
           overlayImage={overlayImage}
           realtimeResult={realtimeResult}
         />
@@ -437,13 +538,16 @@ const ActivePlay = ({ navigateTo }) => {
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-4xl font-bold text-white mb-4">
-              Round {currentRound + 1} of {rounds}
+              {gameMode === "classic"
+                ? "Ready to Play?"
+                : `Round ${currentRound + 1} of ${rounds}`}
             </h2>
             <button
               onClick={startRound}
-              className="px-8 py-4 bg-cyan-600 hover:bg-cyan-700 text-white text-xl font-bold rounded-lg transition-all duration-300"
+              disabled={!socketConnected}
+              className="px-8 py-4 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xl font-bold rounded-lg transition-all duration-300"
             >
-              Start Round
+              {socketConnected ? "Start Round" : "Connecting..."}
             </button>
           </div>
         </div>
@@ -459,9 +563,9 @@ const ActivePlay = ({ navigateTo }) => {
         />
       )}
 
-      {gameState === "waiting" && currentRound > 0 && (
-        <NextRoundButton onClick={handleNextRound} />
-      )}
+      {gameState === "waiting" &&
+        currentRound > 0 &&
+        gameMode !== "classic" && <NextRoundButton onClick={handleNextRound} />}
 
       {gameState === "finished" && (
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
@@ -479,10 +583,10 @@ const ActivePlay = ({ navigateTo }) => {
 
       <DebugPanel
         mlServer={ML_SERVER}
-        isCapturing={gameState === "capturing"}
+        isCapturing={isCapturing}
         cameraStream={cameraStream}
         gameState={gameState}
-        socketConnected={socketConnected} // Use state instead of socketRef.current?.connected
+        socketConnected={socketConnected}
       />
 
       <NeonEffects />
