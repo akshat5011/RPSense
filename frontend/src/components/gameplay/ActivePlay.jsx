@@ -213,7 +213,6 @@ const ActivePlay = ({ navigateTo }) => {
         socketRef.current.io.opts.transports = ["polling"];
       }
     });
-
   };
 
   // Stop capturing frames
@@ -376,8 +375,19 @@ const ActivePlay = ({ navigateTo }) => {
         sendFrameToSocket();
         frameCount++;
       } else {
-        // Stop capturing after 2 seconds
+        // Stop capturing and notify backend
         stopCapturing();
+
+        // Tell backend we're done sending frames
+        if (socketRef.current && !resultReceivedRef.current) {
+          socketRef.current.emit("capture_complete", {
+            totalFrames: frameCount,
+            timestamp: Date.now(),
+          });
+          console.log(
+            `📤 Notified backend: capture complete (${frameCount} frames)`
+          );
+        }
       }
     }, 100);
   };

@@ -133,8 +133,22 @@ def handle_disconnect():
         client_timers[client_id].cancel()
         del client_timers[client_id]
 
-
-# In app.py, fix the timeout logic:
+@socketio.on("capture_complete")
+def handle_capture_complete(data):
+    """Handle capture completion notification from frontend"""
+    client_id = request.sid
+    print(f"📥 Client {client_id} completed capture: {data['totalFrames']} frames")
+    
+    # Give processor 3 more seconds to finish after capture complete
+    if client_id in client_timers:
+        # Cancel existing timer
+        client_timers[client_id].cancel()
+        
+        # Start new 3-second timer for processing
+        timer = Timer(3.0, handle_client_timeout, args=[client_id])
+        timer.start()
+        client_timers[client_id] = timer
+        print(f"⏰ Extended timeout: 3s for processing after capture complete")
 
 
 @socketio.on("frame_data")
@@ -149,6 +163,12 @@ def handle_frame_data(data):
         if client_id not in frame_start_times:
             frame_start_times[client_id] = current_time
 
+            # Start 6-second timeout from first frame
+            timer = Timer(6.0, handle_client_timeout, args=[client_id])
+            timer.start()
+            client_timers[client_id] = timer
+            print(f"⏰ Started 6s timeout for client {client_id}")
+            
         # Update last frame time for this client
         frame_start_times[client_id] = current_time
 
@@ -257,11 +277,6 @@ def handle_start_game(data):
 
     # Clear frame processor buffer for fresh start
     frame_processor.postprocessor.clear_buffer()
-
-    # Start timeout timer (4 seconds to allow for frame processing)
-    timer = Timer(4.0, handle_client_timeout, args=[client_id])
-    timer.start()
-    client_timers[client_id] = timer
 
     emit("game_started", {"message": "Game session started!", "data": data})
 

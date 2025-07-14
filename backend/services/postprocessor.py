@@ -3,6 +3,7 @@ import numpy as np
 from utils.config import Config
 import time
 
+
 class PredictionPostprocessor:
     def __init__(self):
         self.confidence_threshold = Config.CONFIDENCE_THRESHOLD
@@ -76,19 +77,23 @@ class PredictionPostprocessor:
     def should_send_final_result(self):
         """Check if we have enough frames OR timeout reached"""
         has_enough_frames = len(self.frame_buffer) >= self.max_frames * 0.8
-        
-        # Also check if we have any frames and enough time has passed
+
         if self.frame_buffer:
+            # Use current time vs first frame time
             oldest_frame_time = self.frame_buffer[0]["timestamp"]
             if oldest_frame_time is None:
                 return has_enough_frames
+
             try:
                 time_elapsed = time.time() - oldest_frame_time
-                has_timeout = time_elapsed >= 2.5  # 2.5 seconds timeout
-                
-                return has_enough_frames or (len(self.frame_buffer) >= 3 and has_timeout)
+                # More generous timeout - frames come over 2 seconds
+                has_timeout = time_elapsed >= 3.0  # 3 seconds from first frame
+
+                # Need at least 3 frames AND either enough frames OR timeout
+                min_frames_met = len(self.frame_buffer) >= 3
+
+                return has_enough_frames or (min_frames_met and has_timeout)
             except (TypeError, ValueError):
-                # If timestamp is invalid, fall back to frame count only
                 return has_enough_frames
-        
+
         return False
