@@ -209,7 +209,7 @@ const ActivePlay = ({ navigateTo }) => {
   // Handle round completion logic
   const handleRoundCompletion = () => {
     const isClassicMode = gameMode === "classic";
-    const isLastRound = currentRound + 1 >= rounds;
+    const isLastRound = currentRound >= rounds - 1;
 
     if (isClassicMode || isLastRound) {
       // Game finished
@@ -224,6 +224,7 @@ const ActivePlay = ({ navigateTo }) => {
       }
     } else {
       // More rounds to play
+      dispatch(nextRound());
       setGameState("waiting");
       clearRoundState();
     }
@@ -454,7 +455,6 @@ const ActivePlay = ({ navigateTo }) => {
 
   // Next round handler
   const handleNextRound = () => {
-    dispatch(nextRound());
     clearRoundState();
     setGameState("waiting");
   };
@@ -564,7 +564,7 @@ const ActivePlay = ({ navigateTo }) => {
       )}
 
       {gameState === "waiting" &&
-        currentRound > 0 &&
+        currentRound < rounds - 1 &&
         gameMode !== "classic" && <NextRoundButton onClick={handleNextRound} />}
 
       {gameState === "finished" && (
