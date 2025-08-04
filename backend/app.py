@@ -5,7 +5,7 @@ from datetime import datetime
 from utils.config import Config
 from utils.image_utils import decode_frame_from_base64
 from services.frame_processor import FrameProcessor
-from flask_socketio import SocketIO, emit, request
+from flask_socketio import SocketIO, emit
 from services.game_engine import GameEngine
 import time
 import threading
