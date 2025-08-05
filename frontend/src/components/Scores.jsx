@@ -12,9 +12,24 @@ import {
 import { selectAllMatches } from "../redux/slices/gameDataSlice";
 import RPSense from "./CustomUI/RPSense";
 
+/**
+ * Scores Component
+ * 
+ * Displays match history and player statistics in a table format.
+ * Shows player performance, scores, game modes, and timestamps.
+ * 
+ * @param {Object} props - Component props
+ * @param {Function} props.navigateTo - Navigation function to return to menu
+ */
 const Scores = ({ navigateTo }) => {
+  // Get all matches from Redux store
   const matches = useSelector(selectAllMatches);
 
+  /**
+   * Format datetime string into separate date and time components
+   * @param {string} datetime - ISO datetime string
+   * @returns {Object} Object with formatted date and time strings
+   */
   const formatDateTime = (datetime) => {
     const date = new Date(datetime);
     return {
@@ -23,9 +38,15 @@ const Scores = ({ navigateTo }) => {
     };
   };
 
+  /**
+   * Generate score display string and determine win status
+   * @param {Object} match - Match object with win/loss/draw counts
+   * @returns {Object} Object with score string and win status
+   */
   const getScoreDisplay = (match) => {
     const playerWon = match.playerWins > match.computerWins;
     const hasDraws = match.draws > 0;
+    
     return {
       score: hasDraws 
         ? `${match.playerWins}/${match.computerWins}/${match.draws}`
@@ -47,6 +68,14 @@ const Scores = ({ navigateTo }) => {
             hover:scale-105 transition-all duration-300
             relative
           "
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigateTo("menu");
+            }
+          }}
         >
           Go Back
           {/* Animated underline */}
@@ -80,6 +109,9 @@ const Scores = ({ navigateTo }) => {
                     Model
                   </TableHead>
                   <TableHead className="text-cyan-400 font-semibold">
+                    Mode
+                  </TableHead>
+                  <TableHead className="text-cyan-400 font-semibold">
                     Rounds
                   </TableHead>
                   <TableHead className="text-cyan-400 font-semibold">
@@ -100,7 +132,7 @@ const Scores = ({ navigateTo }) => {
                 {matches.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center text-slate-400 py-8"
                     >
                       No matches played yet
@@ -121,6 +153,9 @@ const Scores = ({ navigateTo }) => {
                         </TableCell>
                         <TableCell className="text-purple-400">
                           {match.model}
+                        </TableCell>
+                        <TableCell className="text-cyan-300 capitalize">
+                          {match.gameMode || "classic"}
                         </TableCell>
                         <TableCell className="text-blue-400">
                           {match.rounds}

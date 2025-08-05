@@ -22,9 +22,13 @@ class FrameProcessor:
         Process a single frame through the entire pipeline
         Returns: (status, real_time_result, should_send_final, final_result)
         """
-        timestamp = time.time()
+        # Use frontend timestamp if available, otherwise current time
+        if frame_metadata and 'timestamp' in frame_metadata:
+            timestamp = frame_metadata['timestamp'] / 1000000.0  # Convert microseconds to seconds
+        else:
+            timestamp = time.time()
 
-        # 1. Hand Detection
+        # 1. Hand Detection (using static image mode to avoid timestamp conflicts)
         hand_status, hand_message, hand_data = self.hand_detector.detect_hands(image)   
 
         if hand_status != "success":

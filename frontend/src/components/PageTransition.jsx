@@ -2,13 +2,34 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+/**
+ * PageTransition Component
+ * 
+ * Provides smooth page transitions using Framer Motion animations.
+ * Handles entrance and exit animations for different views in the application.
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.currentView - Current view identifier for animation key
+ * @param {React.ReactNode} props.children - Child components to animate
+ */
 const PageTransition = ({ currentView, children }) => {
+  // Animation variants for page transitions
   const pageVariants = {
-    initial: { opacity: 0, scale: 0.95 },
-    in: { opacity: 1, scale: 1 },
-    out: { opacity: 0, scale: 0.95 },
+    initial: { 
+      opacity: 0, 
+      scale: 0.95 
+    },
+    in: { 
+      opacity: 1, 
+      scale: 1 
+    },
+    out: { 
+      opacity: 0, 
+      scale: 0.95 
+    },
   };
 
+  // Transition configuration for smooth spring animations
   const pageTransition = {
     type: "spring",
     stiffness: 120,

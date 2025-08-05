@@ -2,22 +2,42 @@ import React from "react";
 import ComputerDisplay from "./ui/ComputerDisplay";
 import StatusIndicator from "./ui/StatusIndicator";
 
+/**
+ * ComputerSection Component
+ * 
+ * Displays the AI/Computer side of the Rock Paper Scissors game.
+ * Manages computer choice display, thinking animations, and result revelation.
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.computerChoice - Current computer choice emoji (🤖, 🗿, 📄, ✂️)
+ * @param {Object|null} props.finalResult - Game result object containing winner and moves
+ */
 const ComputerSection = ({ computerChoice, finalResult }) => {
-  // Determine computer state based on game progress
+  /**
+   * Determine computer display state based on game progress
+   * Returns status, message, and choice for UI rendering
+   * 
+   * @returns {Object} Computer state object with status, message, and choice
+   */
   const getComputerState = () => {
+    // Game result is available - show what computer chose
     if (finalResult && finalResult.game_result) {
       return {
         status: "revealed",
         message: `Computer chose ${finalResult.game_result.computer_move.toUpperCase()}!`,
         choice: computerChoice,
       };
-    } else if (computerChoice !== "🤖") {
+    } 
+    // Computer has made a choice but result not yet revealed
+    else if (computerChoice !== "🤖") {
       return {
         status: "thinking",
         message: "Computer is making its choice...",
         choice: computerChoice,
       };
-    } else {
+    } 
+    // Initial state - waiting for game to start
+    else {
       return {
         status: "waiting",
         message: "AI is ready to play",
