@@ -32,6 +32,9 @@ const GameHeader = ({ navigateTo, gameInfo, gameMode }) => {
         <div className="text-white font-semibold">Score</div>
         <div className="text-green-400">Player: {gameInfo.playerScore}</div>
         <div className="text-red-400">Computer: {gameInfo.computerScore}</div>
+        {gameInfo.drawScore > 0 && (
+          <div className="text-yellow-400">Draws: {gameInfo.drawScore}</div>
+        )}
       </div>
     </div>
   );

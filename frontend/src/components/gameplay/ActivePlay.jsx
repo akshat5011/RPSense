@@ -29,6 +29,7 @@ const ActivePlay = ({ navigateTo }) => {
   const socketRef = useRef(null);
   const frameIntervalRef = useRef(null);
   const resultReceivedRef = useRef(false); // Prevent multiple final results
+  const frameTimestampRef = useRef(0); // Monotonic timestamp counter
 
   // Redux state
   const gameMode = useSelector(selectGameMode);
@@ -43,6 +44,7 @@ const ActivePlay = ({ navigateTo }) => {
   const [computerChoice, setComputerChoice] = useState("🤖");
   const [playerScore, setPlayerScore] = useState(0);
   const [computerScore, setComputerScore] = useState(0);
+  const [drawScore, setDrawScore] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false); // Track capturing state
 
   // ML Results
@@ -358,6 +360,9 @@ const ActivePlay = ({ navigateTo }) => {
     setGameState("capturing");
     setIsCapturing(true);
     resultReceivedRef.current = false;
+    
+    // Reset frame timestamp for monotonic sequence
+    frameTimestampRef.current = 0;
 
     // Send start_game event
     socketRef.current.emit("start_game", {
@@ -413,7 +418,10 @@ const ActivePlay = ({ navigateTo }) => {
     // Convert to base64 with quality control
     const frameBase64 = canvas.toDataURL("image/jpeg", 0.7);
 
-    // Send via socket with unique timestamp
+    // Use monotonically increasing timestamp
+    frameTimestampRef.current += 33333; // 30fps = 33333 microseconds per frame
+
+    // Send via socket with monotonic timestamp
     socketRef.current.emit("frame_data", {
       frame: frameBase64,
       gameData: {
@@ -422,7 +430,7 @@ const ActivePlay = ({ navigateTo }) => {
         currentRound: currentRound + 1,
         playerScore,
         computerScore,
-        timestamp: Date.now(),
+        timestamp: frameTimestampRef.current,
         frameId: Math.random().toString(36).substr(2, 9),
       },
     });
@@ -436,8 +444,10 @@ const ActivePlay = ({ navigateTo }) => {
     } else if (winner === "computer") {
       setComputerScore((prev) => prev + 1);
       dispatch(updateScore({ player: 0, computer: 1 }));
+    } else if (winner === "draw") {
+      setDrawScore((prev) => prev + 1);
+      // Draw doesn't update Redux game score, just local tracking
     }
-    // Draw = no score change
   };
 
   // Get emoji for choice
@@ -453,20 +463,15 @@ const ActivePlay = ({ navigateTo }) => {
   // Save match data to Redux
   const saveMatchData = () => {
     const matchData = {
-      id: Date.now(),
-      playerName: currentPlayer?.name || "Player",
+      playerName: currentPlayer?.name || "Guest",
+      model: "AI",
+      rounds: gameMode === "classic" ? 1 : rounds,
+      datetime: new Date().toISOString(),
+      playerWins: playerScore,
+      computerWins: computerScore,
+      draws: drawScore,
+      streak: playerScore > computerScore ? playerScore : 0,
       gameMode,
-      totalRounds: rounds,
-      playerScore,
-      computerScore,
-      winner:
-        playerScore > computerScore
-          ? "player"
-          : computerScore > playerScore
-          ? "computer"
-          : "draw",
-      timestamp: new Date().toISOString(),
-      rounds: [], // Could store individual round results if needed
     };
 
     dispatch(addMatch(matchData));
@@ -516,7 +521,7 @@ const ActivePlay = ({ navigateTo }) => {
   useEffect(() => {
     if (gameState === "finished") {
       setTimeout(() => {
-        navigateTo("score");
+        navigateTo("scores");
       }, 2000);
     }
   }, [gameState]);
@@ -531,6 +536,7 @@ const ActivePlay = ({ navigateTo }) => {
           currentRound: currentRound + 1,
           playerScore,
           computerScore,
+          drawScore,
         }}
         gameMode={gameMode}
       />
@@ -593,7 +599,7 @@ const ActivePlay = ({ navigateTo }) => {
               Game Complete!
             </h2>
             <p className="text-xl text-white mb-4">
-              Final Score: You {playerScore} - {computerScore} Computer
+              Final Score: You {playerScore} - {computerScore} Computer {drawScore > 0 ? `- ${drawScore} Draws` : ''}
             </p>
             <p className="text-lg text-cyan-400">Redirecting to results...</p>
           </div>

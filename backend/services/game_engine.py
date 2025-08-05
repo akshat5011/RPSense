@@ -28,14 +28,14 @@ class GameEngine:
             player_move (str): Player's move
             computer_move (str): Computer's move
         Returns:
-            str: 'player', 'computer', or 'tie'
+            str: 'player', 'computer', or 'draw'
         """
         # If player move is invalid, computer wins by default
         if player_move not in self.moves:
             return 'computer'
             
         if player_move == computer_move:
-            return 'tie'
+            return 'draw'
         elif self.rules[player_move] == computer_move:
             return 'player'
         else:

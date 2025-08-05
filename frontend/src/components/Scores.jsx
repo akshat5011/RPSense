@@ -25,8 +25,11 @@ const Scores = ({ navigateTo }) => {
 
   const getScoreDisplay = (match) => {
     const playerWon = match.playerWins > match.computerWins;
+    const hasDraws = match.draws > 0;
     return {
-      score: `${match.playerWins}/${match.computerWins}`,
+      score: hasDraws 
+        ? `${match.playerWins}/${match.computerWins}/${match.draws}`
+        : `${match.playerWins}/${match.computerWins}`,
       isWin: playerWon,
     };
   };
