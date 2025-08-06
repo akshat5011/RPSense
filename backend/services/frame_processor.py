@@ -24,14 +24,18 @@ class FrameProcessor:
         """
         # Use frontend timestamp if available, otherwise current time
         if frame_metadata and 'timestamp' in frame_metadata:
-            timestamp = frame_metadata['timestamp'] / 1000000.0  # Convert microseconds to seconds
+            # Frontend sends timestamp in microseconds, convert to seconds
+            timestamp = frame_metadata['timestamp'] / 1000000.0
         else:
             timestamp = time.time()
+            
+        print(f"🔍 Processing frame with timestamp: {timestamp}")
 
         # 1. Hand Detection (using static image mode to avoid timestamp conflicts)
         hand_status, hand_message, hand_data = self.hand_detector.detect_hands(image)   
 
         if hand_status != "success":
+            print(f"❌ Hand detection failed: {hand_status} - {hand_message}")
             return (
                 hand_status,
                 {

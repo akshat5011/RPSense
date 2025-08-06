@@ -12,6 +12,8 @@ class PredictionPostprocessor:
 
     def add_prediction(self, prediction, confidence, frame_data):
         """Add a prediction to the buffer"""
+        print(f"📊 Adding prediction: {prediction} (confidence: {confidence:.3f})")
+        
         if confidence >= self.confidence_threshold:
             self.frame_buffer.append(
                 {
@@ -21,6 +23,9 @@ class PredictionPostprocessor:
                     "timestamp": frame_data.get("timestamp"),
                 }
             )
+            print(f"✅ Prediction added to buffer. Buffer size: {len(self.frame_buffer)}")
+        else:
+            print(f"❌ Prediction rejected (confidence {confidence:.3f} < threshold {self.confidence_threshold})")
 
         # Keep only recent frames
         if len(self.frame_buffer) > self.max_frames:
@@ -77,23 +82,38 @@ class PredictionPostprocessor:
     def should_send_final_result(self):
         """Check if we have enough frames OR timeout reached"""
         has_enough_frames = len(self.frame_buffer) >= self.max_frames * 0.8
+        
+        print(f"🔍 Checking final result criteria:")
+        print(f"   Buffer size: {len(self.frame_buffer)}/{self.max_frames}")
+        print(f"   Has enough frames: {has_enough_frames} (need {self.max_frames * 0.8})")
 
         if self.frame_buffer:
             # Use current time vs first frame time
             oldest_frame_time = self.frame_buffer[0]["timestamp"]
             if oldest_frame_time is None:
+                print(f"   No timestamp on oldest frame, using frame count only")
                 return has_enough_frames
 
             try:
-                time_elapsed = time.time() - oldest_frame_time
+                current_time = time.time()
+                time_elapsed = current_time - oldest_frame_time
                 # More generous timeout - frames come over 2 seconds
                 has_timeout = time_elapsed >= 3.0  # 3 seconds from first frame
 
                 # Need at least 3 frames AND either enough frames OR timeout
                 min_frames_met = len(self.frame_buffer) >= 3
+                
+                print(f"   Time elapsed: {time_elapsed:.1f}s (timeout at 3.0s)")
+                print(f"   Has timeout: {has_timeout}")
+                print(f"   Min frames met: {min_frames_met} (need 3)")
+                
+                result = has_enough_frames or (min_frames_met and has_timeout)
+                print(f"   Should send final: {result}")
 
-                return has_enough_frames or (min_frames_met and has_timeout)
-            except (TypeError, ValueError):
+                return result
+            except (TypeError, ValueError) as e:
+                print(f"   Timestamp error: {e}, using frame count only")
                 return has_enough_frames
-
+        
+        print(f"   No frames in buffer")
         return False

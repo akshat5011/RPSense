@@ -8,6 +8,7 @@ class HandDetector:
         self.mp_hands = mp.solutions.hands
         self.mp_drawing = mp.solutions.drawing_utils
 
+        # Initialize hands with base configuration
         self.hands = self.mp_hands.Hands(
             static_image_mode=True,
             max_num_hands=Config.MAX_HANDS,
@@ -26,9 +27,15 @@ class HandDetector:
             
             # Convert BGR to RGB
             rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-            # Process the image
+            
+            # Set writeable False to improve performance
+            rgb_image.flags.writeable = False
+            
+            # Process the image with proper dimensions
             results = self.hands.process(rgb_image)
+            
+            # Set writeable back to True
+            rgb_image.flags.writeable = True
 
             if not results.multi_hand_landmarks:
                 return "no_hands", "No hands detected", None
@@ -37,24 +44,11 @@ class HandDetector:
             if len(results.multi_hand_landmarks) > 1:
                 return "invalid", "Multiple hands detected", None
             
-            # Single hand detected - normalize landmarks with image dimensions
+            # Single hand detected
             hand_landmarks = results.multi_hand_landmarks[0]
-            
-            # # Convert normalized landmarks to pixel coordinates
-            # landmark_coords = []
-            # for landmark in hand_landmarks.landmark:
-            #     x = int(landmark.x * width)
-            #     y = int(landmark.y * height)
-            #     z = landmark.z
-            #     landmark_coords.append([x, y, z])
 
             return "success", "Single hand detected", hand_landmarks
 
-            # return "success", "Single hand detected", {
-            #     'landmarks': hand_landmarks,
-            #     'coordinates': landmark_coords,
-            #     'image_dims': (width, height)
-            # }
         except Exception as e:
             return "error", f"Hand detection error: {str(e)}", None
 
@@ -85,5 +79,8 @@ class HandDetector:
         return status, message, hand_landmarks, annotated_image
 
     def __del__(self):
-        if hasattr(self, "hands"):
-            self.hands.close()
+        try:
+            if hasattr(self, "hands"):
+                self.hands.close()
+        except:
+            pass
