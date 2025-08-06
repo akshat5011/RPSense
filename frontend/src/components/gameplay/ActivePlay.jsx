@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { io } from "socket.io-client";
+import RPSenseAPI from "@/services/api";
 import {
 	selectGameMode,
 	selectRounds,
@@ -27,13 +27,13 @@ import ResultOverlay from "./ui/ResultOverlay";
  *
  * This is the core gameplay component that handles:
  * - Real-time camera capture and video processing
- * - WebSocket communication with ML backend
+ * - HTTP API communication with ML backend for frame processing
  * - Game state management (waiting, countdown, capturing, result, finished)
  * - Round progression and scoring
  * - Error handling and timeout management
  *
  * The component manages a complete game session from start to finish,
- * maintaining persistent camera and socket connections across multiple rounds.
+ * maintaining persistent camera connections and frame buffering.
  */
 
 const ActivePlay = ({ navigateTo }) => {
@@ -42,10 +42,9 @@ const ActivePlay = ({ navigateTo }) => {
 	// Refs for DOM elements and persistent data across renders
 	const videoRef = useRef(null); // Reference to HTML video element for camera display
 	const canvasRef = useRef(null); // Hidden canvas for frame processing and image capture
-	const socketRef = useRef(null); // WebSocket connection to ML backend
+	const apiRef = useRef(null); // API instance for HTTP communication
 	const frameIntervalRef = useRef(null); // Timer for frame capture interval
-	const resultReceivedRef = useRef(false); // Prevent duplicate final results from backend
-	const captureCompleteRef = useRef(false); // Prevent duplicate capture_complete events
+	const resultReceivedRef = useRef(false); // Prevent duplicate final results
 	const frameTimestampRef = useRef(0); // Monotonic timestamp counter for MediaPipe compatibility
 
 	// Score tracking refs to ensure accurate final scores for saving
@@ -73,7 +72,7 @@ const ActivePlay = ({ navigateTo }) => {
 	const [realtimeResult, setRealtimeResult] = useState(null); // Live prediction during capture
 	const [finalResult, setFinalResult] = useState(null); // Final aggregated result after processing
 	const [overlayImage, setOverlayImage] = useState(null); // Processed image with hand detection overlay
-	const [socketConnected, setSocketConnected] = useState(false); // WebSocket connection status
+	const [apiConnected, setApiConnected] = useState(false); // API connection status
 
 	// Round progression state for tournament mode
 	const [showNextRoundPrompt, setShowNextRoundPrompt] = useState(false); // Show "Next Round" UI
@@ -83,6 +82,26 @@ const ActivePlay = ({ navigateTo }) => {
 	// Backend server URL (from environment variable or localhost fallback)
 	const ML_SERVER =
 		process.env.NEXT_PUBLIC_ML_SERVER || "http://localhost:5000";
+
+	// Initialize API on component mount
+	useEffect(() => {
+		apiRef.current = new RPSenseAPI(ML_SERVER);
+		checkAPIConnection();
+	}, [ML_SERVER]);
+
+	/**
+	 * Check API connection status
+	 */
+	const checkAPIConnection = async () => {
+		try {
+			await apiRef.current.healthCheck();
+			setApiConnected(true);
+			console.log("✅ API connected successfully!");
+		} catch (error) {
+			setApiConnected(false);
+			console.error("❌ API connection failed:", error);
+		}
+	};
 
 	console.log(
 		`🎮 Game Mode: ${gameMode} (${
@@ -125,14 +144,14 @@ const ActivePlay = ({ navigateTo }) => {
 
 	/**
 	 * Start capturing frames for ML processing
-	 * Captures 20 frames over 2 seconds (10fps) and sends them to backend
+	 * Captures frames and buffers them, then sends to backend via HTTP
 	 * Includes timeout safety mechanisms and proper session management
 	 */
 	const startCapturing = () => {
-		// Verify socket connection before starting capture
-		if (!socketRef.current || !socketRef.current.connected) {
-			console.error("❌ Socket not connected, cannot start capturing");
-			handleSocketError();
+		// Verify API connection before starting capture
+		if (!apiRef.current || !apiConnected) {
+			console.error("❌ API not connected, cannot start capturing");
+			handleAPIError();
 			return;
 		}
 
@@ -140,18 +159,12 @@ const ActivePlay = ({ navigateTo }) => {
 		setGameState("capturing");
 		setIsCapturing(true);
 		resultReceivedRef.current = false;
-		captureCompleteRef.current = false; // Reset capture complete flag
 
 		// Reset timestamp for monotonic sequence (MediaPipe requirement)
 		frameTimestampRef.current = 1000; // Start from 1000 to avoid zero
 
-		// Notify backend that new game session is starting
-		socketRef.current.emit("start_game", {
-			gameMode,
-			totalRounds: rounds,
-			currentRound: currentRound + 1,
-			playerName: currentPlayer?.name || "Player",
-		});
+		// Clear any previous frame buffer
+		apiRef.current.clearBuffer();
 
 		let frameCount = 0;
 		const maxFrames = 20; // Capture exactly 20 frames (2 seconds at 10fps)
@@ -159,33 +172,12 @@ const ActivePlay = ({ navigateTo }) => {
 		// Frame capture loop - runs every 100ms for 10fps rate
 		frameIntervalRef.current = setInterval(() => {
 			if (frameCount < maxFrames && !resultReceivedRef.current) {
-				sendFrameToSocket(); // Send current frame to backend
+				captureFrameToBuffer(); // Add current frame to buffer
 				frameCount++;
 			} else {
-				// Capture complete - stop and notify backend
+				// Capture complete - stop and process frames
 				stopCapturing();
-
-				// Tell backend we're finished sending frames (only once)
-				if (socketRef.current && !resultReceivedRef.current && !captureCompleteRef.current) {
-					captureCompleteRef.current = true; // Mark as sent
-					socketRef.current.emit("capture_complete", {
-						totalFrames: frameCount,
-						timestamp: Date.now(),
-					});
-					console.log(
-						`📤 Notified backend: capture complete (${frameCount} frames)`
-					);
-
-					// Safety timeout - force result if backend doesn't respond within 8 seconds
-					setTimeout(() => {
-						if (!resultReceivedRef.current) {
-							console.log(
-								"⚠️ No result received within 8s, forcing default result"
-							);
-							handleSocketError();
-						}
-					}, 8000);
-				}
+				processFrameBuffer();
 			}
 		}, 100); // 100ms interval = 10fps
 	};
@@ -350,11 +342,9 @@ const ActivePlay = ({ navigateTo }) => {
 			setGameState("finished");
 			saveMatchData(); // Save results to Redux/localStorage
 
-			// Disconnect socket
-			if (socketRef.current) {
-				socketRef.current.emit("stop_game");
-				socketRef.current.disconnect();
-				socketRef.current = null;
+			// Clear API buffer
+			if (apiRef.current) {
+				apiRef.current.clearBuffer();
 			}
 		} else {
 			// More rounds to play - show round progression UI
@@ -421,7 +411,7 @@ const ActivePlay = ({ navigateTo }) => {
 
 	/**
 	 * Clear state between rounds while preserving session resources
-	 * Resets UI state but keeps camera and socket connections active
+	 * Resets UI state but keeps camera and API connections active
 	 * This approach improves performance and user experience
 	 */
 	const clearRoundState = () => {
@@ -431,196 +421,13 @@ const ActivePlay = ({ navigateTo }) => {
 		setOverlayImage(null);
 		setComputerChoice("🤖");
 		resultReceivedRef.current = false;
-		captureCompleteRef.current = false; // Reset capture complete flag
 		setIsCapturing(false);
 
-		// IMPORTANT: Keep camera and socket connections active between rounds
+		// IMPORTANT: Keep camera and API connections active between rounds
 		// This prevents reconnection delays and improves user experience
 		// Timestamp will be reset at the start of next capture session
 
 		console.log("🧹 Round state cleared (camera kept active)");
-	};
-
-	/**
-	 * Initialize WebSocket connection to ML backend
-	 * Sets up event listeners for all game-related socket events
-	 * Includes special configuration for ngrok tunneling and transport fallbacks
-	 */
-	const initSocket = () => {
-		// Disconnect any existing connection before creating new one
-		if (socketRef.current) {
-			socketRef.current.disconnect();
-		}
-
-		console.log("🔍 Connecting to:", ML_SERVER);
-
-		// Create Socket.IO connection with comprehensive configuration
-		socketRef.current = io(ML_SERVER, {
-			// Transport strategy: Try WebSocket first, fallback to HTTP polling
-			transports: ["websocket", "polling"],
-
-			// Connection reliability options
-			forceNew: true, // Always create a fresh connection
-			upgrade: true, // Allow transport upgrades
-			autoConnect: true, // Connect immediately
-			reconnection: true, // Enable automatic reconnection
-			timeout: 20000, // 20 second connection timeout
-
-			// Special headers for ngrok tunnel compatibility
-			extraHeaders: {
-				"ngrok-skip-browser-warning": "true",
-				Origin: window.location.origin,
-			},
-
-			// Transport-specific configuration for ngrok
-			transportOptions: {
-				polling: {
-					extraHeaders: {
-						"ngrok-skip-browser-warning": "true",
-						Origin: window.location.origin,
-					},
-				},
-				websocket: {
-					extraHeaders: {
-						"ngrok-skip-browser-warning": "true",
-					},
-				},
-			},
-
-			// Disable features that can cause issues with ngrok
-			rememberUpgrade: false,
-			timestampRequests: false,
-		});
-
-		// === Socket Event Handlers ===
-
-		// Connection successful - log details and update UI
-		socketRef.current.on("connect", () => {
-			console.log("✅ Socket connected successfully!");
-			console.log(
-				"✅ Transport:",
-				socketRef.current.io.engine.transport.name
-			);
-			console.log("✅ Socket ID:", socketRef.current.id);
-			setSocketConnected(true);
-		});
-
-		// Connection lost - handle graceful reconnection
-		socketRef.current.on("disconnect", (reason) => {
-			console.log("🔌 Socket disconnected:", reason);
-			setSocketConnected(false);
-
-			// Attempt reconnection for server-side disconnections
-			if (
-				reason === "io server disconnect" ||
-				reason === "ping timeout"
-			) {
-				console.log("🔄 Attempting to reconnect...");
-				setTimeout(() => {
-					if (socketRef.current) {
-						socketRef.current.connect();
-					}
-				}, 2000);
-			}
-		});
-
-		// Connection error - try transport fallback and handle capture failures
-		socketRef.current.on("connect_error", (error) => {
-			console.error("❌ Connection error:", error.message);
-			setSocketConnected(false);
-
-			// Switch to polling if WebSocket fails
-			if (error.type === "TransportError") {
-				console.log("🔄 Switching to polling transport...");
-				socketRef.current.io.opts.transports = ["polling"];
-			}
-		});
-
-		// === Game-Specific Event Handlers ===
-
-		// Initial connection confirmation from server
-		socketRef.current.on("connected", (data) => {
-			console.log("✅ Connected to ML server:", data);
-		});
-
-		// Real-time predictions during frame capture (sent for each frame)
-		socketRef.current.on("real_time_result", (data) => {
-			console.log("📊 Real-time result:", data);
-
-			// Only process if we haven't received final result yet
-			if (!resultReceivedRef.current) {
-				setRealtimeResult(data);
-
-				// Display processed image with hand detection overlay
-				if (data.overlay_image) {
-					setOverlayImage(data.overlay_image);
-				}
-			}
-		});
-
-		// Final aggregated result after processing all frames
-		socketRef.current.on("final_result", (data) => {
-			console.log("🎯 Final result:", data);
-
-			// Prevent duplicate final results from race conditions
-			if (resultReceivedRef.current) {
-				console.log("⚠️ Duplicate final result ignored");
-				return;
-			}
-
-			resultReceivedRef.current = true;
-			setFinalResult(data);
-
-			// Stop frame capture immediately
-			stopCapturing();
-
-			// Update UI with computer's choice and game scores
-			if (data.game_result) {
-				setComputerChoice(
-					getEmojiForChoice(data.game_result.computer_move)
-				);
-				updateGameScore(data.game_result.winner);
-			}
-
-			// Show result overlay and proceed to next round after delay
-			setGameState("result");
-			setTimeout(() => {
-				handleRoundCompletion();
-			}, 3000);
-		});
-
-		// Game session started confirmation
-		socketRef.current.on("game_started", (data) => {
-			console.log("🎮 Game started:", data);
-		});
-
-		// Generic error handling from server
-		socketRef.current.on("error", (data) => {
-			console.error("❌ Socket error:", data);
-
-			// Force result if we're in the middle of capturing
-			if (isCapturing && !resultReceivedRef.current) {
-				console.log("🔄 Forcing result due to socket error");
-				handleSocketError();
-			}
-		});
-
-		// Additional connection error handling with transport fallback
-		socketRef.current.on("connect_error", (error) => {
-			console.error("❌ Connection error:", error.message);
-			setSocketConnected(false);
-
-			// Handle capture failures during connection errors
-			if (isCapturing && !resultReceivedRef.current) {
-				handleSocketError();
-			}
-
-			// Try switching to more reliable polling transport
-			if (error.type === "TransportError") {
-				console.log("🔄 Switching to polling transport...");
-				socketRef.current.io.opts.transports = ["polling"];
-			}
-		});
 	};
 
 	/**
@@ -637,51 +444,13 @@ const ActivePlay = ({ navigateTo }) => {
 	};
 
 	/**
-	 * Handle socket errors and connection failures during gameplay
-	 * Creates a default result where computer wins and proceeds with game flow
-	 * Ensures game doesn't get stuck even when technical issues occur
-	 */
-	const handleSocketError = () => {
-		stopCapturing();
-
-		if (!resultReceivedRef.current) {
-			resultReceivedRef.current = true;
-
-			// Create error result where computer wins by default
-			const errorResult = {
-				status: "error",
-				final_prediction: "error",
-				confidence: 0.0,
-				message: "Connection error - Computer wins",
-				game_result: {
-					computer_move: "rock",
-					player_move: "error",
-					winner: "computer",
-					valid_move: false,
-					reason: "Connection error",
-				},
-			};
-
-			// Update UI and continue game flow
-			setFinalResult(errorResult);
-			setComputerChoice("🗿");
-			updateGameScore("computer");
-
-			setGameState("result");
-			setTimeout(() => {
-				handleRoundCompletion();
-			}, 3000);
-		}
-	};
-
-	/**
-	 * Capture current video frame and send to backend via WebSocket
-	 * Converts video frame to base64 JPEG and includes game metadata
+	 * Capture current video frame and add to buffer
+	 * Converts video frame to base64 JPEG and includes metadata
 	 * Uses monotonic timestamps to prevent MediaPipe processing errors
 	 */
-	const sendFrameToSocket = () => {
-		// Verify required resources are available (video, canvas, socket)
-		if (!videoRef.current || !canvasRef.current || !socketRef.current)
+	const captureFrameToBuffer = () => {
+		// Verify required resources are available (video, canvas, API)
+		if (!videoRef.current || !canvasRef.current || !apiRef.current)
 			return;
 
 		const canvas = canvasRef.current;
@@ -705,22 +474,104 @@ const ActivePlay = ({ navigateTo }) => {
 		const frameBase64 = canvas.toDataURL("image/jpeg", 0.7);
 
 		// Generate monotonic timestamp (required by MediaPipe for proper frame ordering)
-		// Increment by 1000 microseconds to ensure each frame has unique, increasing timestamp
 		frameTimestampRef.current += 1000;
 
-		// Send frame data and game context to backend via WebSocket
-		socketRef.current.emit("frame_data", {
-			frame: frameBase64, // Base64 encoded JPEG image
-			gameData: {
-				gameMode, // Current game mode (classic/tournament)
-				totalRounds: rounds, // Total rounds for this game
-				currentRound: currentRound + 1, // Current round number (1-indexed)
-				playerScore, // Current player score
-				computerScore, // Current computer score
-				timestamp: frameTimestampRef.current, // Monotonic timestamp for MediaPipe
-				frameId: Math.random().toString(36).substr(2, 9), // Unique frame identifier
-			},
+		// Add frame to buffer with metadata
+		apiRef.current.addFrame(frameBase64, {
+			gameMode,
+			totalRounds: rounds,
+			currentRound: currentRound + 1,
+			playerScore,
+			computerScore,
+			timestamp: frameTimestampRef.current,
 		});
+	};
+
+	/**
+	 * Process buffered frames via HTTP API
+	 * Sends all captured frames to backend and handles response
+	 */
+	const processFrameBuffer = async () => {
+		if (!apiRef.current || resultReceivedRef.current) return;
+
+		try {
+			console.log(`📤 Processing ${apiRef.current.getBufferSize()} frames via HTTP`);
+
+			const gameData = {
+				gameMode,
+				totalRounds: rounds,
+				currentRound: currentRound + 1,
+				playerName: currentPlayer?.name || "Player",
+			};
+
+			const result = await apiRef.current.processFrames(gameData);
+			
+			if (resultReceivedRef.current) {
+				console.log("⚠️ Duplicate result ignored");
+				return;
+			}
+
+			resultReceivedRef.current = true;
+			console.log("🎯 Final result:", result);
+
+			// Process the result
+			if (result.game_result) {
+				setComputerChoice(getEmojiForChoice(result.game_result.computer_move));
+				updateGameScore(result.game_result.winner);
+			} else {
+				// Handle timeout/error cases
+				setComputerChoice("🗿");
+				updateGameScore("computer");
+			}
+
+			setFinalResult(result);
+			setGameState("result");
+
+			// Show result overlay and proceed to next round after delay
+			setTimeout(() => {
+				handleRoundCompletion();
+			}, 3000);
+
+		} catch (error) {
+			console.error("❌ Error processing frames:", error);
+			handleAPIError();
+		}
+	};
+
+	/**
+	 * Handle API connection errors and continue game flow
+	 * Provides fallback result when backend is unavailable
+	 */
+	const handleAPIError = () => {
+		console.log("⚠️ Handling API error - providing fallback result");
+
+		if (!resultReceivedRef.current) {
+			resultReceivedRef.current = true;
+
+			// Create error result that awards point to computer
+			const errorResult = {
+				status: "error",
+				final_prediction: "error",
+				confidence: 0.0,
+				detected_hand: false,
+				game_result: {
+					player_move: "error",
+					winner: "computer",
+					valid_move: false,
+					reason: "Connection error",
+				},
+			};
+
+			// Update UI and continue game flow
+			setFinalResult(errorResult);
+			setComputerChoice("🗿");
+			updateGameScore("computer");
+
+			setGameState("result");
+			setTimeout(() => {
+				handleRoundCompletion();
+			}, 3000);
+		}
 	};
 
 	/**
@@ -759,11 +610,9 @@ const ActivePlay = ({ navigateTo }) => {
 			videoRef.current.srcObject = null;
 		}
 
-		// Clean up WebSocket connection
-		if (socketRef.current) {
-			socketRef.current.emit("stop_game"); // Notify backend of game termination
-			socketRef.current.disconnect(); // Close connection
-			socketRef.current = null; // Clear reference
+		// Clear API buffer
+		if (apiRef.current) {
+			apiRef.current.clearBuffer();
 		}
 
 		// Reset game state in Redux store
@@ -791,15 +640,13 @@ const ActivePlay = ({ navigateTo }) => {
 
 	/**
 	 * Component initialization effect
-	 * Sets up socket connection on mount and cleans up on unmount
+	 * Sets up API connection on mount and cleans up on unmount
 	 * Ensures proper resource management throughout component lifecycle
 	 */
 	useEffect(() => {
 		// Initialize Redux game state and scores for new game
 		dispatch(startGame()); // This resets Redux currentRound, scores, etc.
 		resetScores(); // Reset local scores and refs
-
-		initSocket(); // Initialize WebSocket connection
 
 		// Cleanup function runs on component unmount
 		return () => {
@@ -820,9 +667,9 @@ const ActivePlay = ({ navigateTo }) => {
 				videoRef.current.srcObject = null;
 			}
 
-			// Disconnect WebSocket
-			if (socketRef.current) {
-				socketRef.current.disconnect();
+			// Clear API buffer
+			if (apiRef.current) {
+				apiRef.current.clearBuffer();
 			}
 		};
 	}, []);
@@ -879,10 +726,10 @@ const ActivePlay = ({ navigateTo }) => {
 						</h2>
 						<button
 							onClick={startRound}
-							disabled={!socketConnected}
+							disabled={!apiConnected}
 							className="px-8 py-4 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xl font-bold rounded-lg transition-all duration-300"
 						>
-							{socketConnected ? "Start Round" : "Connecting..."}
+							{apiConnected ? "Start Round" : "Connecting..."}
 						</button>
 					</div>
 				</div>
@@ -948,7 +795,7 @@ const ActivePlay = ({ navigateTo }) => {
 				isCapturing={isCapturing}
 				cameraStream={cameraStream}
 				gameState={gameState}
-				socketConnected={socketConnected}
+				apiConnected={apiConnected}
 			/>
 
 			<NeonEffects />
