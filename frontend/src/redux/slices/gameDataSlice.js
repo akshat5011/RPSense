@@ -42,7 +42,7 @@ const gameDataSlice = createSlice({
       const matchData = {
         id: Date.now() + Math.random(), // Unique ID
         playerName: action.payload.playerName,
-        model: action.payload.model || "AI", // AI model used
+        model: action.payload.model || "MobileNetV2", // AI model used
         rounds: action.payload.rounds,
         datetime: action.payload.datetime || new Date().toISOString(),
         playerWins: action.payload.playerWins,

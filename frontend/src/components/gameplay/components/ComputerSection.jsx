@@ -1,6 +1,6 @@
 import React from "react";
-import ComputerDisplay from "./ui/ComputerDisplay";
-import StatusIndicator from "./ui/StatusIndicator";
+import ComputerDisplay from "../ui/ComputerDisplay";
+import StatusIndicator from "../ui/StatusIndicator";
 
 /**
  * ComputerSection Component

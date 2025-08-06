@@ -1,6 +1,6 @@
 import React from "react";
-import CameraView from "./ui/CameraView";
-import StatusIndicator from "./ui/StatusIndicator";
+import CameraView from "../ui/CameraView";
+import StatusIndicator from "../ui/StatusIndicator";
 
 /**
  * PlayerCameraSection Component
