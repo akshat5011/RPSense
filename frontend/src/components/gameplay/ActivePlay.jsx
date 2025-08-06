@@ -8,19 +8,19 @@ import {
 	updateScore,
 	nextRound,
 	resetGame,
+	startGame,
 } from "@/redux/slices/gameSlice";
 import { selectCurrentPlayer, addMatch } from "@/redux/slices/gameDataSlice";
 
 // Components
-import GameHeader from "./GameHeader";
-import PlayerCameraSection from "./PlayerCameraSection";
-import ComputerSection from "./ComputerSection";
-import DebugPanel from "./DebugPanel";
+import GameHeader from "./components/GameHeader";
+import PlayerCameraSection from "./components/PlayerCameraSection";
+import ComputerSection from "./components/ComputerSection";
+import DebugPanel from "./components/DebugPanel";
 import NeonEffects from "./ui/NeonEffects";
 import HiddenCanvas from "./ui/HiddenCanvas";
 import CountdownOverlay from "./ui/CountdownOverlay";
 import ResultOverlay from "./ui/ResultOverlay";
-import NextRoundButton from "./ui/NextRoundButton";
 
 /**
  * ActivePlay Component - Main Game Interface
@@ -46,6 +46,11 @@ const ActivePlay = ({ navigateTo }) => {
 	const frameIntervalRef = useRef(null); // Timer for frame capture interval
 	const resultReceivedRef = useRef(false); // Prevent duplicate final results from backend
 	const frameTimestampRef = useRef(0); // Monotonic timestamp counter for MediaPipe compatibility
+	
+	// Score tracking refs to ensure accurate final scores for saving
+	const playerScoreRef = useRef(0);
+	const computerScoreRef = useRef(0);
+	const drawScoreRef = useRef(0);
 
 	// Redux state - Game configuration and round management
 	const gameMode = useSelector(selectGameMode); // "classic" or "tournament"
@@ -68,10 +73,19 @@ const ActivePlay = ({ navigateTo }) => {
 	const [finalResult, setFinalResult] = useState(null); // Final aggregated result after processing
 	const [overlayImage, setOverlayImage] = useState(null); // Processed image with hand detection overlay
 	const [socketConnected, setSocketConnected] = useState(false); // WebSocket connection status
+	
+	// Round progression state for tournament mode
+	const [showNextRoundPrompt, setShowNextRoundPrompt] = useState(false); // Show "Next Round" UI
+	const [nextRoundCountdown, setNextRoundCountdown] = useState(5); // 5-second countdown to next round
+	const nextRoundTimeoutRef = useRef(null); // Ref to store the countdown interval for cleanup
 
 	// Backend server URL (from environment variable or localhost fallback)
 	const ML_SERVER =
 		process.env.NEXT_PUBLIC_ML_SERVER || "http://localhost:5000";
+
+	console.log(`🎮 Game Mode: ${gameMode} (${gameMode === 'classic' ? '1 round' : `${rounds} rounds`})`);
+	console.log(`🎯 Current Round: ${currentRound + 1}/${rounds}`);
+	console.log(`📊 Current Scores - Player: ${playerScore}, Computer: ${computerScore}, Draws: ${drawScore}`);
 
 	/**
 	 * Initialize camera stream from user's webcam
@@ -173,6 +187,8 @@ const ActivePlay = ({ navigateTo }) => {
 	 * Automatically proceeds to frame capture after countdown completes
 	 */
 	const startRound = async () => {
+		console.log(`🚀 Starting round ${currentRound + 1}/${rounds} in ${gameMode} mode`);
+		
 		// Initialize camera only if not already available or not working
 		if (!cameraStream || !videoRef.current?.srcObject) {
 			console.log("🎥 Initializing camera for round...");
@@ -182,6 +198,7 @@ const ActivePlay = ({ navigateTo }) => {
 		}
 
 		// Prepare for new round
+		console.log("🧹 Clearing previous round state...");
 		clearRoundState();
 		setGameState("countdown");
 		setCountdown(3);
@@ -194,6 +211,7 @@ const ActivePlay = ({ navigateTo }) => {
 					startCapturing(); // Begin frame capture when countdown ends
 					return 0;
 				}
+				console.log(`⏰ Countdown: ${prev - 1}`);
 				return prev - 1;
 			});
 		}, 1000);
@@ -205,16 +223,32 @@ const ActivePlay = ({ navigateTo }) => {
 	 * Updates both local state and Redux store for persistence
 	 */
 	const updateGameScore = (winner) => {
+		console.log(`🏆 Updating score - Winner: ${winner}`);
+		
 		if (winner === "player") {
-			setPlayerScore((prev) => prev + 1);
+			setPlayerScore((prev) => {
+				const newScore = prev + 1;
+				playerScoreRef.current = newScore; // Keep ref in sync
+				return newScore;
+			});
 			dispatch(updateScore({ player: 1, computer: 0 }));
 		} else if (winner === "computer") {
-			setComputerScore((prev) => prev + 1);
+			setComputerScore((prev) => {
+				const newScore = prev + 1;
+				computerScoreRef.current = newScore; // Keep ref in sync
+				return newScore;
+			});
 			dispatch(updateScore({ player: 0, computer: 1 }));
 		} else if (winner === "draw") {
-			setDrawScore((prev) => prev + 1);
+			setDrawScore((prev) => {
+				const newScore = prev + 1;
+				drawScoreRef.current = newScore; // Keep ref in sync
+				return newScore;
+			});
 			// Draw doesn't update Redux game score, just local tracking
 		}
+		
+		console.log(`📊 Current totals - Player: ${playerScoreRef.current}, Computer: ${computerScoreRef.current}, Draws: ${drawScoreRef.current}`);
 	};
 
 	/**
@@ -223,54 +257,133 @@ const ActivePlay = ({ navigateTo }) => {
 	 * Used for player history and analytics tracking
 	 */
 	const saveMatchData = () => {
+		// Use current ref values to ensure we have the latest scores
+		const finalPlayerWins = playerScoreRef.current;
+		const finalComputerWins = computerScoreRef.current;
+		const finalDraws = drawScoreRef.current;
+
 		const matchData = {
 			playerName: currentPlayer?.name || "Guest", // Player identifier
-			model: "AI", // Opponent type (always AI)
+			model: "MobileNetV2", // AI model used for predictions
 			rounds: gameMode === "classic" ? 1 : rounds, // Total rounds played
 			datetime: new Date().toISOString(), // Match completion timestamp
-			playerWins: playerScore, // Player's win count
-			computerWins: computerScore, // Computer's win count
-			draws: drawScore, // Number of draw rounds
-			streak: playerScore > computerScore ? playerScore : 0, // Win streak calculation
+			playerWins: finalPlayerWins, // Player's win count
+			computerWins: finalComputerWins, // Computer's win count
+			draws: finalDraws, // Number of draw rounds
+			streak: finalPlayerWins > finalComputerWins ? finalPlayerWins : 0, // Win streak calculation
 			gameMode, // Game mode (classic/tournament)
 		};
 
+		console.log("💾 Saving match data to Redux store:", matchData);
+		console.log(`📊 Final Score - Player: ${finalPlayerWins}, Computer: ${finalComputerWins}, Draws: ${finalDraws}`);
+		console.log(`🏆 Winner: ${finalPlayerWins > finalComputerWins ? 'Player' : finalComputerWins > finalPlayerWins ? 'Computer' : 'Draw'}`);
+
 		// Add match to player's game history in Redux store
 		dispatch(addMatch(matchData));
+		console.log("✅ Match data saved successfully!");
 	};
 
 	/**
 	 * Handle round completion and determine if game continues or ends
 	 * Manages the transition between rounds and final game completion
 	 * Handles resource cleanup when appropriate
+	 * 
+	 * CLASSIC MODE: Always ends after 1 round
+	 * TOURNAMENT MODE: Shows round progression UI with 5-second countdown and manual override
 	 */
 	const handleRoundCompletion = () => {
 		const isClassicMode = gameMode === "classic";
-		const isLastRound = currentRound >= rounds - 1;
+		const roundJustCompleted = currentRound + 1; // The round we just completed (1-indexed)
+		const isLastRound = roundJustCompleted >= rounds;
+		
+		console.log("🏁 Round completion check:");
+		console.log(`   - Game Mode: ${gameMode}`);
+		console.log(`   - Round just completed: ${roundJustCompleted}/${rounds}`);
+		console.log(`   - Current Redux round: ${currentRound}`);
+		console.log(`   - Is Classic Mode: ${isClassicMode}`);
+		console.log(`   - Is Last Round: ${isLastRound}`);
 
 		if (isClassicMode || isLastRound) {
 			// Game completely finished - cleanup all resources
+			console.log("🎯 Game finished! Saving match data and cleaning up...");
+			
+			// Immediately release camera resources to stop the flash/indicator
+			if (cameraStream) {
+				cameraStream.getTracks().forEach((track) => track.stop());
+				setCameraStream(null); // Clear camera stream state
+			}
+			
+			// Clear video element source immediately
+			if (videoRef.current) {
+				videoRef.current.srcObject = null;
+			}
+			
 			setGameState("finished");
 			saveMatchData(); // Save results to Redux/localStorage
 
-			// Disconnect socket and stop camera only when game is completely done
+			// Disconnect socket
 			if (socketRef.current) {
 				socketRef.current.emit("stop_game");
 				socketRef.current.disconnect();
 				socketRef.current = null;
 			}
-
-			// Release camera resources
-			if (cameraStream) {
-				cameraStream.getTracks().forEach((track) => track.stop());
-				setCameraStream(null);
-			}
 		} else {
-			// More rounds to play - keep socket and camera active for performance
-			dispatch(nextRound()); // Increment round counter in Redux
-			setGameState("waiting"); // Return to waiting for next round
-			clearRoundState(); // Clear round-specific data
+			// More rounds to play - show round progression UI
+			console.log("🔄 More rounds to play, showing round progression...");
+			
+			// Clear round-specific data but keep scores
+			clearRoundState();
+			
+			// Show "Next Round" prompt with countdown
+			setShowNextRoundPrompt(true);
+			setNextRoundCountdown(5);
+			
+			// Clear any existing countdown interval first
+			if (nextRoundTimeoutRef.current) {
+				clearInterval(nextRoundTimeoutRef.current);
+				nextRoundTimeoutRef.current = null;
+			}
+			
+			// Start 5-second countdown to automatically proceed
+			let countdown = 5;
+			nextRoundTimeoutRef.current = setInterval(() => {
+				countdown -= 1;
+				setNextRoundCountdown(countdown);
+				
+				if (countdown <= 0) {
+					clearInterval(nextRoundTimeoutRef.current);
+					nextRoundTimeoutRef.current = null;
+					
+					// Increment round counter and proceed
+					dispatch(nextRound());
+					proceedToNextRound();
+				}
+			}, 1000);
+			
+			console.log(`⏱️ 5-second countdown started for round ${roundJustCompleted + 1}/${rounds}`);
 		}
+	};
+
+	/**
+	 * Proceed to the next round (either automatically after countdown or manually)
+	 * Transitions game state to "waiting" for the next round to begin
+	 */
+	const proceedToNextRound = () => {
+		console.log("➡️ Proceeding to next round...");
+		
+		// Clear any active countdown timer
+		if (nextRoundTimeoutRef.current) {
+			clearInterval(nextRoundTimeoutRef.current);
+			nextRoundTimeoutRef.current = null;
+		}
+		
+		// If called manually, we need to increment round counter
+		if (showNextRoundPrompt) {
+			dispatch(nextRound());
+		}
+		
+		setShowNextRoundPrompt(false);
+		setGameState("waiting");
 	};
 
 	/**
@@ -591,27 +704,25 @@ const ActivePlay = ({ navigateTo }) => {
 	};
 
 	/**
-	 * Handle progression to next round
-	 * Resets round state and prepares for next game
-	 * Used in tournament mode between rounds
-	 */
-	const handleNextRound = () => {
-		clearRoundState(); // Reset all round-specific state
-		setGameState("waiting"); // Return to waiting state for next round
-	};
-
-	/**
 	 * Handle game exit and cleanup
 	 * Stops all active processes and releases resources
 	 * Navigates back to main menu or previous screen
 	 */
 	const handleExitGame = () => {
+		console.log("🚪 Exiting game and cleaning up resources...");
+		
 		// Stop any active frame capturing
 		stopCapturing();
 
 		// Release camera resources if active
 		if (cameraStream) {
 			cameraStream.getTracks().forEach((track) => track.stop());
+			setCameraStream(null);
+		}
+
+		// Clear video element source
+		if (videoRef.current) {
+			videoRef.current.srcObject = null;
 		}
 
 		// Clean up WebSocket connection
@@ -623,9 +734,28 @@ const ActivePlay = ({ navigateTo }) => {
 
 		// Reset game state in Redux store
 		dispatch(resetGame());
+		console.log("🔄 Game state reset in Redux");
+		
 		// Navigate back to main menu
+		console.log("🏠 Navigating back to main menu");
 		navigateTo("menu");
 	};
+
+  
+	/**
+	 * Reset all score tracking (both state and refs)
+	 * Used when starting a new game or resetting current game
+	 */
+	const resetScores = () => {
+		setPlayerScore(0);
+		setComputerScore(0);
+		setDrawScore(0);
+		playerScoreRef.current = 0;
+		computerScoreRef.current = 0;
+		drawScoreRef.current = 0;
+		console.log("🔄 All scores reset to 0");
+	};
+
 
 	/**
 	 * Component initialization effect
@@ -633,15 +763,29 @@ const ActivePlay = ({ navigateTo }) => {
 	 * Ensures proper resource management throughout component lifecycle
 	 */
 	useEffect(() => {
+		// Initialize Redux game state and scores for new game
+		dispatch(startGame()); // This resets Redux currentRound, scores, etc.
+		resetScores(); // Reset local scores and refs
+		
 		initSocket(); // Initialize WebSocket connection
 
 		// Cleanup function runs on component unmount
 		return () => {
 			stopCapturing(); // Stop any active frame capture
 
+			// Clear countdown timer if active
+			if (nextRoundTimeoutRef.current) {
+				clearInterval(nextRoundTimeoutRef.current);
+			}
+
 			// Release camera resources
 			if (cameraStream) {
 				cameraStream.getTracks().forEach((track) => track.stop());
+			}
+
+			// Clear video element source
+			if (videoRef.current) {
+				videoRef.current.srcObject = null;
 			}
 
 			// Disconnect WebSocket
@@ -678,7 +822,7 @@ const ActivePlay = ({ navigateTo }) => {
 			<div className="grid grid-cols-2 gap-8 px-8 h-[calc(100vh-120px)]">
 				<PlayerCameraSection
 					videoRef={videoRef}
-					cameraStream={cameraStream}
+					cameraStream={gameState === "finished" ? null : cameraStream} // Hide camera when game finished
 					isCapturing={isCapturing} // Use local state instead of gameState
 					overlayImage={overlayImage}
 					realtimeResult={realtimeResult}
@@ -693,27 +837,26 @@ const ActivePlay = ({ navigateTo }) => {
 			<HiddenCanvas canvasRef={canvasRef} />
 
 			{/* Game State Overlays */}
-			{gameState === "waiting" &&
-				(currentRound < rounds || gameMode === "classic") && (
-					<div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-						<div className="text-center">
-							<h2 className="text-4xl font-bold text-white mb-4">
-								{gameMode === "classic"
-									? "Ready to Play?"
-									: `Round ${currentRound + 1} of ${rounds}`}
-							</h2>
-							<button
-								onClick={startRound}
-								disabled={!socketConnected}
-								className="px-8 py-4 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xl font-bold rounded-lg transition-all duration-300"
-							>
-								{socketConnected
-									? "Start Round"
-									: "Connecting..."}
-							</button>
-						</div>
+			{gameState === "waiting" && (
+				<div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+					<div className="text-center">
+						<h2 className="text-4xl font-bold text-white mb-4">
+							{gameMode === "classic"
+								? "Ready to Play?"
+								: `Round ${currentRound + 1} of ${rounds}`}
+						</h2>
+						<button
+							onClick={startRound}
+							disabled={!socketConnected}
+							className="px-8 py-4 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xl font-bold rounded-lg transition-all duration-300"
+						>
+							{socketConnected
+								? "Start Round"
+								: "Connecting..."}
+						</button>
 					</div>
-				)}
+				</div>
+			)}
 
 			{gameState === "countdown" && (
 				<CountdownOverlay countdown={countdown} />
@@ -727,11 +870,29 @@ const ActivePlay = ({ navigateTo }) => {
 				/>
 			)}
 
-			{gameState === "waiting" &&
-				currentRound < rounds - 1 &&
-				gameMode !== "classic" && (
-					<NextRoundButton onClick={handleNextRound} />
-				)}
+			{/* Round Progression UI (Tournament Mode) */}
+			{showNextRoundPrompt && gameMode === "tournament" && (
+				<div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
+					<div className="text-center space-y-4">
+						<h2 className="text-3xl font-bold text-white mb-2">
+							Round {currentRound + 1} Complete!
+						</h2>
+						<p className="text-xl text-white/80 mb-4">
+							Current Score: You {playerScore} - {computerScore} Computer
+							{drawScore > 0 ? ` - ${drawScore} Draws` : ""}
+						</p>
+						<p className="text-lg text-cyan-400 mb-6">
+							Next round starts in {nextRoundCountdown} seconds...
+						</p>
+						<button
+							onClick={proceedToNextRound}
+							className="px-8 py-4 bg-cyan-600 hover:bg-cyan-700 text-white text-xl font-bold rounded-lg transition-all duration-300"
+						>
+							Start Round {currentRound + 2} Now
+						</button>
+					</div>
+				</div>
+			)}
 
 			{gameState === "finished" && (
 				<div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
