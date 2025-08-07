@@ -715,7 +715,7 @@ const ActivePlay = ({ navigateTo }) => {
 			)}
 
 			{gameState === "capturing" && (
-				<div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+				<div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
 					<div className="text-center">
 						<div className="text-6xl mb-4 animate-pulse">📹</div>
 						<h2 className="text-3xl font-bold text-cyan-400 mb-2">
@@ -729,7 +729,7 @@ const ActivePlay = ({ navigateTo }) => {
 			)}
 
 			{gameState === "waitingForResult" && (
-				<div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+				<div className="absolute inset-0 bg-black/40  flex items-center justify-center pointer-events-none">
 					<div className="text-center">
 						<div className="text-6xl mb-4 animate-spin">🔄</div>
 						<h2 className="text-3xl font-bold text-purple-400 mb-2">
