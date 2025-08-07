@@ -59,6 +59,77 @@ def test_interface():
     return render_template("index2.html")
 
 
+@app.route("/model-test", methods=["GET"])
+def model_test_interface():
+    """Render real-time model testing interface with camera and gesture detection"""
+    return render_template("model_test.html")
+
+
+@app.route("/process-single-frame", methods=["POST"])
+def process_single_frame():
+    """
+    Process a single frame for real-time model testing
+    Returns gesture prediction, confidence, and bounding box data
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+            
+        frame_base64 = data.get("frame")
+        if not frame_base64:
+            return jsonify({"error": "No frame provided"}), 400
+            
+        print("📥 Processing single frame for model testing")
+        
+        # Decode frame
+        image = decode_frame_from_base64(frame_base64)
+        if image is None:
+            return jsonify({"error": "Failed to decode frame"}), 400
+            
+        # Add minimal frame metadata for testing
+        frame_metadata = {
+            "timestamp": data.get("timestamp", time.time()),
+            "frameId": data.get("frameId", 1),
+            "testing_mode": True
+        }
+        
+        # Process frame
+        status, real_time_result, should_send_final, final_result = (
+            frame_processor.process_frame(image, frame_metadata=frame_metadata)
+        )
+        
+        if status == "success" and real_time_result:
+            print(f"✅ Frame processed successfully: {real_time_result.get('prediction', 'unknown')}")
+            return jsonify({
+                "status": "success",
+                "prediction": real_time_result.get("prediction", "unknown"),
+                "confidence": real_time_result.get("confidence", 0.0),
+                "detected_hand": real_time_result.get("detected_hand", False),
+                "bounding_box": real_time_result.get("bounding_box", None),
+                "landmarks": real_time_result.get("landmarks", None),
+                "processed_image": real_time_result.get("processed_image", None),
+                "timestamp": time.time()
+            })
+        else:
+            print("⚠️ No detection in frame")
+            return jsonify({
+                "status": "no_detection",
+                "prediction": "none",
+                "confidence": 0.0,
+                "detected_hand": False,
+                "bounding_box": None,
+                "landmarks": None,
+                "processed_image": None,
+                "timestamp": time.time()
+            })
+        
+    except Exception as e:
+        print(f"❌ Error in process_single_frame: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/process-frames", methods=["POST"])
 def process_frames():
     """

@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPSense Model Testing Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a, #7c3aed, #ec4899);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .video-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        .overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stats-header {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #fbbf24;
+        }
+
+        .stat-item {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .prediction-display {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .prediction-emoji {
+            font-size: 4rem;
+            margin-bottom: 10px;
+        }
+
+        .prediction-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #fbbf24, #10b981);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+
+        .fps-counter {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 RPSense Model Testing</h1>
+            <p>Real-time Hand Gesture Recognition Testing Interface</p>
+        </div>
+
+        <div class="main-content">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="overlay" class="overlay-canvas"></canvas>
+                    <div class="fps-counter" id="fpsCounter">FPS: 0</div>
+                </div>
+                
+                <div class="controls">
+                    <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                    <button id="stopBtn" class="btn btn-danger" disabled>Stop Camera</button>
+                </div>
+            </div>
+
+            <div class="stats-panel">
+                <div class="stats-header">🤖 Model Output</div>
+                
+                <div class="prediction-display">
+                    <div class="prediction-emoji" id="predictionEmoji">🤖</div>
+                    <div class="prediction-text" id="predictionText">Ready</div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">
+                        <span class="status-indicator" id="cameraStatus"></span>
+                        Camera Status
+                    </div>
+                    <div class="stat-value" id="cameraStatusText">Disconnected</div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">Gesture Detected</div>
+                    <div class="stat-value" id="gestureValue">None</div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">Confidence</div>
+                    <div class="stat-value" id="confidenceValue">0%</div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">Hand Detected</div>
+                    <div class="stat-value" id="handDetected">No</div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">Processing Time</div>
+                    <div class="stat-value" id="processingTime">0ms</div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">Frames Processed</div>
+                    <div class="stat-value" id="framesProcessed">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ModelTester {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('overlay');
+                this.ctx = this.canvas.getContext('2d');
+                this.stream = null;
+                this.isProcessing = false;
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+                this.fps = 0;
+
+                this.initializeElements();
+                this.bindEvents();
+            }
+
+            initializeElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.cameraStatus = document.getElementById('cameraStatus');
+                this.cameraStatusText = document.getElementById('cameraStatusText');
+                this.predictionEmoji = document.getElementById('predictionEmoji');
+                this.predictionText = document.getElementById('predictionText');
+                this.confidenceFill = document.getElementById('confidenceFill');
+                this.gestureValue = document.getElementById('gestureValue');
+                this.confidenceValue = document.getElementById('confidenceValue');
+                this.handDetected = document.getElementById('handDetected');
+                this.processingTime = document.getElementById('processingTime');
+                this.framesProcessed = document.getElementById('framesProcessed');
+                this.fpsCounter = document.getElementById('fpsCounter');
+            }
+
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startCamera());
+                this.stopBtn.addEventListener('click', () => this.stopCamera());
+                
+                this.video.addEventListener('loadedmetadata', () => {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                });
+            }
+
+            async startCamera() {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            facingMode: 'user'
+                        }
+                    });
+
+                    this.video.srcObject = this.stream;
+                    this.updateCameraStatus(true);
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+
+                    // Start processing frames
+                    this.video.addEventListener('play', () => {
+                        this.processFrames();
+                    });
+
+                } catch (error) {
+                    console.error('Error accessing camera:', error);
+                    alert('Failed to access camera. Please check permissions.');
+                }
+            }
+
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+
+                this.video.srcObject = null;
+                this.isProcessing = false;
+                this.updateCameraStatus(false);
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+
+                // Reset display
+                this.resetDisplay();
+            }
+
+            updateCameraStatus(connected) {
+                if (connected) {
+                    this.cameraStatus.className = 'status-indicator status-connected';
+                    this.cameraStatusText.textContent = 'Connected';
+                } else {
+                    this.cameraStatus.className = 'status-indicator status-disconnected';
+                    this.cameraStatusText.textContent = 'Disconnected';
+                }
+            }
+
+            resetDisplay() {
+                this.predictionEmoji.textContent = '🤖';
+                this.predictionText.textContent = 'Ready';
+                this.confidenceFill.style.width = '0%';
+                this.gestureValue.textContent = 'None';
+                this.confidenceValue.textContent = '0%';
+                this.handDetected.textContent = 'No';
+                this.processingTime.textContent = '0ms';
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            async processFrames() {
+                if (!this.video.videoWidth || !this.video.videoHeight) {
+                    requestAnimationFrame(() => this.processFrames());
+                    return;
+                }
+
+                this.isProcessing = true;
+
+                const processFrame = async () => {
+                    if (!this.isProcessing) return;
+
+                    try {
+                        // Calculate FPS
+                        const now = performance.now();
+                        if (now - this.lastTime >= 1000) {
+                            this.fps = this.frameCount;
+                            this.frameCount = 0;
+                            this.lastTime = now;
+                            this.fpsCounter.textContent = `FPS: ${this.fps}`;
+                        }
+                        this.frameCount++;
+
+                        // Capture frame
+                        const canvas = document.createElement('canvas');
+                        canvas.width = this.video.videoWidth;
+                        canvas.height = this.video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(this.video, 0, 0);
+                        
+                        const frameData = canvas.toDataURL('image/jpeg', 0.8);
+                        const startTime = performance.now();
+
+                        // Send frame to backend
+                        const response = await fetch('/process-single-frame', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                frame: frameData,
+                                timestamp: Date.now(),
+                                frameId: this.frameCount
+                            })
+                        });
+
+                        const result = await response.json();
+                        const processingTime = performance.now() - startTime;
+
+                        this.updateDisplay(result, processingTime);
+                        this.framesProcessed.textContent = (parseInt(this.framesProcessed.textContent) + 1).toString();
+
+                    } catch (error) {
+                        console.error('Error processing frame:', error);
+                    }
+
+                    // Process next frame (throttle to ~10 FPS for processing)
+                    setTimeout(() => requestAnimationFrame(processFrame), 100);
+                };
+
+                processFrame();
+            }
+
+            updateDisplay(result, processingTime) {
+                // Update prediction display
+                const prediction = result.prediction || 'none';
+                const confidence = result.confidence || 0;
+
+                // Update emoji
+                const emojiMap = {
+                    'rock': '🗿',
+                    'paper': '📄',
+                    'scissors': '✂️',
+                    'none': '❓',
+                    'unknown': '❓'
+                };
+                this.predictionEmoji.textContent = emojiMap[prediction] || '❓';
+                
+                // Update text
+                this.predictionText.textContent = prediction.toUpperCase();
+                
+                // Update confidence bar
+                const confidencePercent = Math.round(confidence * 100);
+                this.confidenceFill.style.width = `${confidencePercent}%`;
+                
+                // Update stats
+                this.gestureValue.textContent = prediction.charAt(0).toUpperCase() + prediction.slice(1);
+                this.confidenceValue.textContent = `${confidencePercent}%`;
+                this.handDetected.textContent = result.detected_hand ? 'Yes' : 'No';
+                this.processingTime.textContent = `${Math.round(processingTime)}ms`;
+
+                // Draw bounding box if available
+                this.drawBoundingBox(result.bounding_box);
+            }
+
+            drawBoundingBox(boundingBox) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (boundingBox && boundingBox.length === 4) {
+                    const [x, y, w, h] = boundingBox;
+                    
+                    // Scale coordinates to canvas size
+                    const scaleX = this.canvas.width / this.video.videoWidth;
+                    const scaleY = this.canvas.height / this.video.videoHeight;
+                    
+                    const scaledX = x * scaleX;
+                    const scaledY = y * scaleY;
+                    const scaledW = w * scaleX;
+                    const scaledH = h * scaleY;
+
+                    // Draw bounding box
+                    this.ctx.strokeStyle = '#00ff00';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeRect(scaledX, scaledY, scaledW, scaledH);
+
+                    // Draw corner markers
+                    const cornerSize = 20;
+                    this.ctx.strokeStyle = '#ffff00';
+                    this.ctx.lineWidth = 4;
+                    
+                    // Top-left corner
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(scaledX, scaledY + cornerSize);
+                    this.ctx.lineTo(scaledX, scaledY);
+                    this.ctx.lineTo(scaledX + cornerSize, scaledY);
+                    this.ctx.stroke();
+                    
+                    // Top-right corner
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(scaledX + scaledW - cornerSize, scaledY);
+                    this.ctx.lineTo(scaledX + scaledW, scaledY);
+                    this.ctx.lineTo(scaledX + scaledW, scaledY + cornerSize);
+                    this.ctx.stroke();
+                    
+                    // Bottom-left corner
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(scaledX, scaledY + scaledH - cornerSize);
+                    this.ctx.lineTo(scaledX, scaledY + scaledH);
+                    this.ctx.lineTo(scaledX + cornerSize, scaledY + scaledH);
+                    this.ctx.stroke();
+                    
+                    // Bottom-right corner
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(scaledX + scaledW - cornerSize, scaledY + scaledH);
+                    this.ctx.lineTo(scaledX + scaledW, scaledY + scaledH);
+                    this.ctx.lineTo(scaledX + scaledW, scaledY + scaledH - cornerSize);
+                    this.ctx.stroke();
+                }
+            }
+        }
+
+        // Initialize the model tester when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new ModelTester();
+        });
+    </script>
+</body>
+</html>
