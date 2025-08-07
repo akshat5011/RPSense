@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPSense WebSocket Test</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <title>RPSense HTTP API Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -110,20 +109,20 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎮 RPSense WebSocket Test Interface</h1>
-            <p>Test the Rock Paper Scissors ML Server WebSocket Connection</p>
+            <h1>🎮 RPSense HTTP API Test Interface</h1>
+            <p>Test the Rock Paper Scissors ML Server HTTP API Endpoints</p>
         </div>
 
-        <!-- Connection Status -->
+        <!-- API Status -->
         <div class="section">
-            <h3>Connection Status</h3>
+            <h3>API Status</h3>
             <div class="controls">
-                <span id="connection-status">
+                <span id="api-status">
                     <span class="status-indicator disconnected"></span>
-                    Disconnected
+                    Not Connected
                 </span>
-                <button id="connect-btn" onclick="connectSocket()">Connect</button>
-                <button id="disconnect-btn" onclick="disconnectSocket()" disabled>Disconnect</button>
+                <button id="test-api-btn" onclick="testAPI()">Test API Connection</button>
+                <button id="single-frame-btn" onclick="testSingleFrame()" disabled>Test Single Frame</button>
             </div>
         </div>
 
@@ -139,44 +138,50 @@
                 </div>
             </div>
 
-            <!-- Game Controls -->
+            <!-- Batch Processing Controls -->
             <div class="section">
-                <h3>🎮 Game Controls</h3>
+                <h3>🎮 Batch Frame Processing</h3>
                 <div class="controls">
-                    <button onclick="startGame()" id="start-game-btn" disabled>Start Game</button>
-                    <button onclick="stopGame()" id="stop-game-btn" disabled>Stop Game</button>
-                    <button onclick="startCapture()" id="start-capture-btn" disabled>Start Capture (2s)</button>
-                    <button onclick="stopCapture()" id="stop-capture-btn" disabled>Stop Capture</button>
+                    <button onclick="startBatchCapture()" id="start-batch-btn" disabled>Start Batch Capture (2s)</button>
+                    <button onclick="stopBatchCapture()" id="stop-batch-btn" disabled>Stop Batch Capture</button>
+                    <button onclick="processBatch()" id="process-batch-btn" disabled>Process Captured Frames</button>
+                    <button onclick="clearFrames()" id="clear-frames-btn">Clear Frames</button>
+                </div>
+                
+                <div class="controls">
+                    <span>Captured Frames: <span id="frame-count">0</span></span>
                 </div>
                 
                 <!-- Current Prediction Display -->
                 <div id="prediction-display" class="prediction-display" style="display: none;">
-                    <h4>Current Prediction:</h4>
+                    <h4>Single Frame Result:</h4>
                     <div id="prediction-text"></div>
                     <div id="confidence-text"></div>
+                    <div id="hand-detected-text"></div>
                 </div>
 
                 <!-- Final Result Display -->
                 <div id="final-result" style="display: none;">
-                    <h4>Final Result:</h4>
+                    <h4>Batch Processing Result:</h4>
                     <div id="final-text"></div>
+                    <div id="game-result-text"></div>
                 </div>
             </div>
         </div>
 
         <!-- Image Display -->
         <div class="section">
-            <h3>🖼️ AI Overlay Images</h3>
+            <h3>🖼️ Processing Results</h3>
             <div class="grid">
                 <div>
-                    <h4>Real-time Overlay:</h4>
+                    <h4>Single Frame Result:</h4>
                     <img id="realtime-image" class="image-display" style="display: none;" />
-                    <div id="no-realtime">No real-time image</div>
+                    <div id="no-realtime">No single frame result</div>
                 </div>
                 <div>
-                    <h4>Final Overlay:</h4>
+                    <h4>Batch Processing Result:</h4>
                     <img id="final-image" class="image-display" style="display: none;" />
-                    <div id="no-final">No final image</div>
+                    <div id="no-final">No batch result</div>
                 </div>
             </div>
         </div>
@@ -190,12 +195,13 @@
     </div>
 
     <script>
-        let socket = null;
         let video = null;
         let canvas = null;
         let ctx = null;
         let stream = null;
         let captureInterval = null;
+        let capturedFrames = [];
+        let frameCounter = 0;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -203,92 +209,88 @@
             canvas = document.getElementById('canvas');
             ctx = canvas.getContext('2d');
             
-            // Auto-connect on load
-            connectSocket();
+            // Auto-test API on load
+            testAPI();
         });
 
-        // Socket Management
-        function connectSocket() {
-            const serverUrl = window.location.origin;
-            logMessage(`Connecting to ${serverUrl}...`, 'info');
-            
-            socket = io(serverUrl);
-            
-            socket.on('connect', () => {
-                updateConnectionStatus(true);
-                logMessage('Socket connected successfully!', 'success');
-            });
-            
-            socket.on('disconnect', () => {
-                updateConnectionStatus(false);
-                logMessage('Socket disconnected', 'warning');
-            });
-            
-            socket.on('connected', (data) => {
-                logMessage(`Server says: ${data.message}`, 'success');
-            });
-            
-            socket.on('real_time_result', (data) => {
-                logMessage(`Real-time: ${data.prediction} (${(data.confidence * 100).toFixed(1)}%)`, 'info');
-                updatePredictionDisplay(data);
+        // API Management
+        async function testAPI() {
+            try {
+                logMessage('Testing API connection...', 'info');
                 
-                if (data.overlay_image) {
-                    document.getElementById('realtime-image').src = data.overlay_image;
-                    document.getElementById('realtime-image').style.display = 'block';
-                    document.getElementById('no-realtime').style.display = 'none';
+                const response = await fetch('/');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    updateAPIStatus(true);
+                    logMessage(`API connected: ${data.message}`, 'success');
+                } else {
+                    updateAPIStatus(false);
+                    logMessage('API test failed', 'error');
                 }
-            });
-            
-            socket.on('final_result', (data) => {
-                logMessage(`Final result: ${data.final_prediction} (${(data.confidence * 100).toFixed(1)}%)`, 'success');
-                updateFinalResult(data);
-                
-                if (data.final_overlay_image) {
-                    document.getElementById('final-image').src = data.final_overlay_image;
-                    document.getElementById('final-image').style.display = 'block';
-                    document.getElementById('no-final').style.display = 'none';
-                }
-                
-                // Stop capture automatically
-                stopCapture();
-            });
-            
-            socket.on('game_started', (data) => {
-                logMessage(`Game started: ${JSON.stringify(data)}`, 'success');
-            });
-            
-            socket.on('game_stopped', (data) => {
-                logMessage(`Game stopped: ${data.message}`, 'warning');
-            });
-            
-            socket.on('error', (data) => {
-                logMessage(`Error: ${data.message}`, 'error');
-            });
-        }
-
-        function disconnectSocket() {
-            if (socket) {
-                socket.disconnect();
-                socket = null;
+            } catch (error) {
+                updateAPIStatus(false);
+                logMessage(`API connection error: ${error.message}`, 'error');
             }
         }
 
-        function updateConnectionStatus(connected) {
-            const statusElement = document.getElementById('connection-status');
-            const connectBtn = document.getElementById('connect-btn');
-            const disconnectBtn = document.getElementById('disconnect-btn');
-            const gameButtons = ['start-game-btn', 'stop-game-btn', 'start-capture-btn'];
+        async function testSingleFrame() {
+            if (!video.srcObject) {
+                logMessage('Cannot test single frame: No camera active', 'error');
+                return;
+            }
+
+            try {
+                logMessage('Testing single frame processing...', 'info');
+                
+                // Capture current frame
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+                const frameData = canvas.toDataURL('image/jpeg', 0.8);
+
+                const requestData = {
+                    frame: frameData,
+                    timestamp: Date.now(),
+                    frameId: 1
+                };
+
+                const response = await fetch('/process-single-frame', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success' || result.status === 'no_detection') {
+                    logMessage(`Single frame result: ${result.prediction} (${(result.confidence * 100).toFixed(1)}%)`, 'success');
+                    updateSingleFrameDisplay(result);
+                } else {
+                    logMessage(`Single frame error: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                logMessage(`Single frame test error: ${error.message}`, 'error');
+            }
+        }
+
+        function updateAPIStatus(connected) {
+            const statusElement = document.getElementById('api-status');
+            const testBtn = document.getElementById('test-api-btn');
+            const singleFrameBtn = document.getElementById('single-frame-btn');
+            const batchButtons = ['start-batch-btn', 'process-batch-btn'];
             
             if (connected) {
-                statusElement.innerHTML = '<span class="status-indicator connected"></span>Connected';
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = false;
-                gameButtons.forEach(id => document.getElementById(id).disabled = false);
+                statusElement.innerHTML = '<span class="status-indicator connected"></span>API Connected';
+                singleFrameBtn.disabled = false;
+                batchButtons.forEach(id => document.getElementById(id).disabled = false);
             } else {
-                statusElement.innerHTML = '<span class="status-indicator disconnected"></span>Disconnected';
-                connectBtn.disabled = false;
-                disconnectBtn.disabled = true;
-                gameButtons.forEach(id => document.getElementById(id).disabled = true);
+                statusElement.innerHTML = '<span class="status-indicator disconnected"></span>API Disconnected';
+                singleFrameBtn.disabled = true;
+                batchButtons.forEach(id => document.getElementById(id).disabled = true);
             }
         }
 
@@ -315,66 +317,50 @@
             }
         }
 
-        // Game Controls
-        function startGame() {
-            if (!socket) return;
-            
-            const gameData = {
-                gameMode: 'test',
-                totalRounds: 1,
-                currentRound: 1,
-                playerName: 'Test Player'
-            };
-            
-            socket.emit('start_game', gameData);
-            logMessage('Sent start_game event', 'info');
-        }
-
-        function stopGame() {
-            if (!socket) return;
-            
-            socket.emit('stop_game');
-            logMessage('Sent stop_game event', 'info');
-            stopCapture();
-        }
-
-        function startCapture() {
-            if (!socket || !video.srcObject) {
-                logMessage('Cannot start capture: No socket or camera', 'error');
+        // Batch Processing Controls
+        function startBatchCapture() {
+            if (!video.srcObject) {
+                logMessage('Cannot start capture: No camera active', 'error');
                 return;
             }
             
-            document.getElementById('start-capture-btn').disabled = true;
-            document.getElementById('stop-capture-btn').disabled = false;
+            document.getElementById('start-batch-btn').disabled = true;
+            document.getElementById('stop-batch-btn').disabled = false;
+            document.getElementById('process-batch-btn').disabled = true;
             
-            logMessage('Starting frame capture (10fps for 2 seconds)...', 'info');
+            capturedFrames = [];
+            frameCounter = 0;
+            updateFrameCount();
+            
+            logMessage('Starting batch frame capture (10fps for 2 seconds)...', 'info');
             
             // Capture at 10fps
-            captureInterval = setInterval(sendFrame, 100);
+            captureInterval = setInterval(captureFrame, 100);
             
             // Auto-stop after 2 seconds
             setTimeout(() => {
                 if (captureInterval) {
-                    stopCapture();
-                    logMessage('Auto-stopped capture after 2 seconds', 'info');
+                    stopBatchCapture();
+                    logMessage('Auto-stopped batch capture after 2 seconds', 'info');
                 }
             }, 2000);
         }
 
-        function stopCapture() {
+        function stopBatchCapture() {
             if (captureInterval) {
                 clearInterval(captureInterval);
                 captureInterval = null;
                 
-                document.getElementById('start-capture-btn').disabled = false;
-                document.getElementById('stop-capture-btn').disabled = true;
+                document.getElementById('start-batch-btn').disabled = false;
+                document.getElementById('stop-batch-btn').disabled = true;
+                document.getElementById('process-batch-btn').disabled = capturedFrames.length === 0;
                 
-                logMessage('Frame capture stopped', 'warning');
+                logMessage(`Batch capture stopped. Captured ${capturedFrames.length} frames`, 'warning');
             }
         }
 
-        function sendFrame() {
-            if (!video || !canvas || !socket) return;
+        function captureFrame() {
+            if (!video || !canvas) return;
             
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -382,44 +368,122 @@
             
             const frameData = canvas.toDataURL('image/jpeg', 0.8);
             
-            const data = {
+            capturedFrames.push({
                 frame: frameData,
-                gameData: {
-                    gameMode: 'test',
-                    totalRounds: 1,
-                    currentRound: 1,
-                    timestamp: Date.now()
-                }
-            };
+                timestamp: Date.now(),
+                frameId: frameCounter++
+            });
             
-            socket.emit('frame_data', data);
+            updateFrameCount();
+        }
+
+        async function processBatch() {
+            if (capturedFrames.length === 0) {
+                logMessage('No frames to process', 'error');
+                return;
+            }
+
+            try {
+                logMessage(`Processing batch of ${capturedFrames.length} frames...`, 'info');
+                
+                const requestData = {
+                    frames: capturedFrames,
+                    gameData: {
+                        gameMode: 'test',
+                        totalRounds: 1,
+                        currentRound: 1,
+                        playerName: 'Test Player',
+                        timestamp: Date.now()
+                    }
+                };
+
+                const response = await fetch('/process-frames', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success' || result.status === 'no_detection') {
+                    logMessage(`Batch result: ${result.final_prediction} (${(result.confidence * 100).toFixed(1)}%)`, 'success');
+                    updateBatchResult(result);
+                    
+                    if (result.game_result) {
+                        logMessage(`Game outcome: Player=${result.final_prediction}, Computer=${result.game_result.computer_move}, Winner=${result.game_result.winner}`, 'info');
+                    }
+                } else {
+                    logMessage(`Batch processing error: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                logMessage(`Batch processing error: ${error.message}`, 'error');
+            }
+        }
+
+        function clearFrames() {
+            capturedFrames = [];
+            frameCounter = 0;
+            updateFrameCount();
+            document.getElementById('process-batch-btn').disabled = true;
+            logMessage('Cleared captured frames', 'info');
+        }
+
+        function updateFrameCount() {
+            document.getElementById('frame-count').textContent = capturedFrames.length;
         }
 
         // UI Updates
-        function updatePredictionDisplay(data) {
+        function updateSingleFrameDisplay(data) {
             const display = document.getElementById('prediction-display');
             const predText = document.getElementById('prediction-text');
             const confText = document.getElementById('confidence-text');
+            const handText = document.getElementById('hand-detected-text');
             
             predText.textContent = `Prediction: ${data.prediction?.toUpperCase() || 'Unknown'}`;
             confText.textContent = `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+            handText.textContent = `Hand Detected: ${data.detected_hand ? 'Yes' : 'No'}`;
             display.style.display = 'block';
+            
+            // Show processed image if available
+            if (data.processed_image) {
+                document.getElementById('realtime-image').src = data.processed_image;
+                document.getElementById('realtime-image').style.display = 'block';
+                document.getElementById('no-realtime').style.display = 'none';
+            }
         }
 
-        function updateFinalResult(data) {
+        function updateBatchResult(data) {
             const display = document.getElementById('final-result');
             const finalText = document.getElementById('final-text');
+            const gameResultText = document.getElementById('game-result-text');
             
-            let resultText = `Player: ${data.final_prediction?.toUpperCase()}`;
+            let resultText = `Final Prediction: ${data.final_prediction?.toUpperCase()}`;
+            resultText += `\nConfidence: ${(data.confidence * 100).toFixed(1)}%`;
+            resultText += `\nFrames Processed: ${data.processed_frames || 0}`;
             
+            let gameText = '';
             if (data.game_result) {
-                resultText += `\nComputer: ${data.game_result.computer_move?.toUpperCase()}`;
-                resultText += `\nWinner: ${data.game_result.winner?.toUpperCase()}`;
+                gameText = `Player: ${data.final_prediction?.toUpperCase()}`;
+                gameText += `\nComputer: ${data.game_result.computer_move?.toUpperCase()}`;
+                gameText += `\nWinner: ${data.game_result.winner?.toUpperCase()}`;
+                gameText += `\nResult: ${data.game_result.result?.toUpperCase()}`;
             }
             
             finalText.style.whiteSpace = 'pre-line';
             finalText.textContent = resultText;
+            gameResultText.style.whiteSpace = 'pre-line';
+            gameResultText.textContent = gameText;
             display.style.display = 'block';
+            
+            // Show final processed image if available
+            if (data.final_overlay_image) {
+                document.getElementById('final-image').src = data.final_overlay_image;
+                document.getElementById('final-image').style.display = 'block';
+                document.getElementById('no-final').style.display = 'none';
+            }
         }
 
         // Logging
@@ -439,11 +503,8 @@
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', function() {
-            stopCapture();
+            stopBatchCapture();
             stopCamera();
-            if (socket) {
-                socket.disconnect();
-            }
         });
     </script>
 </body>
