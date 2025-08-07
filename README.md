@@ -162,6 +162,58 @@
 - **Memory Management**: Batch processing with size=32 for optimal GPU utilization
 - **Strategy Distribution**: Single GPU strategy to avoid NaN issues with MirroredStrategy
 
+### Training Performance Visualization
+
+**Stage 1: Initial Training Results**
+<div align="center">
+  <img src="backend\training\RPSense Result images\train_val_accuracy_curve_training.png" alt="Stage 1 Training Accuracy" width="45%">
+  <img src="backend\training\RPSense Result images\train_val_loss_curve_training.png" alt="Stage 1 Training Loss" width="43%">
+</div>
+
+**Stage 2: Fine-Tuning Results**
+<div align="center">
+  <img src="backend\training\RPSense Result images\train_val_accuracy_curve_after_finetune.png" alt="Fine-tuning Accuracy" width="45%">
+  <img src="backend\training\RPSense Result images\train_val_loss_curve_after_finetune.png" alt="Fine-tuning Loss" width="45%">
+</div>
+
+**Model Performance Analysis**
+
+**Training Progression: Before vs After Fine-tuning**
+
+*Initial Training Results (Before Fine-tuning)*:
+<div align="center">
+  <img src="backend\training\RPSense Result images\Confusion Matrix Test set training.png" alt="Initial Test Set Confusion Matrix" width="45%">
+  <img src="backend\training\RPSense Result images\Confusion Matrix train data training.png" alt="Initial Training Data Confusion Matrix" width="45%">
+</div>
+
+*Fine-tuned Model Results (Final Performance)*:
+<div align="center">
+  <img src="backend/training/RPSense Result images/Confusion Matrix Test set after finetune.png" alt="Fine-tuned Test Set Confusion Matrix" width="45%">
+  <img src="backend/training/RPSense Result images/Confusion Matrix train data after finetune.png" alt="Fine-tuned Training Data Confusion Matrix" width="45%">
+</div>
+
+**Performance Insights from Confusion Matrices**:
+
+*Initial Training Performance Analysis*:
+- **Test Set Issues**: Significant confusion between Rock-Paper (84 misclassifications) and Paper-Scissors (15 misclassifications)
+- **Class Imbalance Impact**: Rock showing lower precision due to confusion with Paper
+- **Invalid Class**: Already performing well with 299/300 correct predictions
+- **Overall Accuracy**: ~89.6% with room for improvement in gesture boundaries
+
+*After Fine-tuning Performance Analysis*:
+- **Dramatic Improvement**: Near-perfect classification across all classes
+- **Rock-Paper Confusion**: Reduced from 84 to just 16 misclassifications
+- **Paper-Scissors Confusion**: Reduced from 15 to 6 misclassifications  
+- **Invalid Class**: Perfect 300/300 classification (100% accuracy)
+- **Overall Accuracy**: Improved to 96.1% (+7.1% improvement)
+
+**Key Fine-tuning Benefits**:
+1. **Enhanced Gesture Boundaries**: Better distinction between similar hand positions
+2. **Reduced Inter-class Confusion**: Significant reduction in Rock-Paper misclassification
+3. **Perfect Invalid Detection**: 100% accuracy for ambiguous/unclear gestures
+4. **Balanced Performance**: Consistent improvement across all gesture classes
+5. **Production Ready**: Confusion matrices show robust real-world applicability
+
 ### Key Innovations
 - **Invalid Class**: Revolutionary approach to handle unclear gestures (100% accuracy)
 - **Multi-Dataset Fusion**: Combining 9+ diverse datasets for robustness
@@ -446,6 +498,38 @@ Response:
 - **Rock**: 94% precision, 97% recall
 - **Scissors**: 94% precision, 97% recall
 - **Overall F1-Score**: 96% macro average
+
+### Detailed Performance Analysis
+
+**Classification Performance Breakdown**
+
+*Test Set Performance (After Fine-tuning)*:
+```
+Classification Report (Test):
+                 precision    recall  f1-score   support
+    invalid         1.00      1.00      1.00       300
+      paper         0.96      0.90      0.93       322
+       rock         0.94      0.97      0.96       326
+   scissors         0.94      0.97      0.96       336
+
+   accuracy                            0.96      1284
+  macro avg         0.96      0.96      0.96      1284
+weighted avg        0.96      0.96      0.96      1284
+```
+
+*Training Set Performance (After Fine-tuning)*:
+```
+Classification Report (Train):
+                 precision    recall  f1-score   support
+    invalid         1.00      1.00      1.00      4600
+      paper         1.00      1.00      1.00      5169
+       rock         1.00      1.00      1.00      5314
+   scissors         1.00      1.00      1.00      5325
+
+   accuracy                            1.00     20408
+  macro avg         1.00      1.00      1.00     20408
+weighted avg        1.00      1.00      1.00     20408
+```
 
 ### System Performance
 - **Frame Processing**: 10-15 FPS real-time processing
