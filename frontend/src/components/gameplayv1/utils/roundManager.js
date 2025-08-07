@@ -12,9 +12,8 @@
  * @param {Object} stateSetters - Functions to set game state
  * @param {Function} initCamera - Function to initialize camera
  * @param {Function} clearRoundState - Function to clear round state
- * @param {Function} startCapturing - Function to start frame capturing
  */
-export const startRound = async (roundConfig, resources, stateSetters, initCamera, clearRoundState, startCapturing) => {
+export const startRound = async (roundConfig, resources, stateSetters, initCamera, clearRoundState) => {
 	const { gameState, gameMode, currentRound, rounds } = roundConfig;
 	const { cameraStream, videoRef } = resources;
 	const { setGameState, setCountdown } = stateSetters;
@@ -48,7 +47,7 @@ export const startRound = async (roundConfig, resources, stateSetters, initCamer
 		setCountdown((prev) => {
 			if (prev <= 1) {
 				clearInterval(countdownTimer);
-				startCapturing(); // Begin frame capture when countdown ends
+				console.log("⏰ Countdown complete! Transition to capturing state handled by main component");
 				return 0;
 			}
 			console.log(`⏰ Countdown: ${prev - 1}`);

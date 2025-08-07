@@ -125,10 +125,12 @@ const ActivePlay = ({ navigateTo }) => {
 			gameMode === "classic" ? "1 round" : `${rounds} rounds`
 		})`
 	);
-	console.log(`🎯 Current Round: ${currentRound + 1}/${rounds}`);
+	console.log(`🎯 Current Round: ${currentRound + 1}/${rounds} (0-indexed: ${currentRound})`);
 	console.log(
 		`📊 Current Scores - Player: ${playerScore}, Computer: ${computerScore}, Draws: ${drawScore}`
 	);
+	console.log(`🎛️ Game State: ${gameState}`);
+	console.log(`🔄 Is Capturing: ${isCapturing}`);
 
 	/**
 	 * Initialize camera stream from user's webcam
@@ -159,6 +161,11 @@ const ActivePlay = ({ navigateTo }) => {
 	 * Start the round sequence with countdown
 	 */
 	const startRound = async () => {
+		console.log("🚀 ===== STARTING ROUND =====");
+		console.log(`   - Current Round: ${currentRound + 1}/${rounds}`);
+		console.log(`   - Game Mode: ${gameMode}`);
+		console.log("🚀 ============================");
+		
 		const roundConfig = { gameState, gameMode, currentRound, rounds };
 		const resources = { cameraStream, videoRef };
 		const stateSetters = { setGameState, setCountdown };
@@ -168,9 +175,10 @@ const ActivePlay = ({ navigateTo }) => {
 			resources, 
 			stateSetters, 
 			initCamera, 
-			clearRoundState, 
-			startCapturing
+			clearRoundState
 		);
+		
+		console.log("🔄 Round initialization complete - countdown started");
 	};
 
 	/**
@@ -227,24 +235,35 @@ const ActivePlay = ({ navigateTo }) => {
 	 * Handle complete game finish (classic mode or last tournament round)
 	 */
 	const handleGameCompletion = () => {
+		console.log("🏁 ===== GAME COMPLETION =====");
+		console.log("   - Stopping camera resources immediately");
+		
 		// Immediately release camera resources to stop the flash/indicator
 		if (cameraStream) {
-			cameraStream.getTracks().forEach((track) => track.stop());
+			cameraStream.getTracks().forEach((track) => {
+				console.log(`   - Stopping camera track: ${track.kind} - ${track.label}`);
+				track.stop();
+			});
 			setCameraStream(null);
+			console.log("   - Camera stream cleared");
 		}
 
 		// Clear video element source immediately
 		if (videoRef.current) {
 			videoRef.current.srcObject = null;
+			console.log("   - Video element source cleared");
 		}
 
+		console.log("   - Setting gameState to 'finished'");
 		setGameState("finished");
 		saveMatchData();
 
 		// Clear API buffer
 		if (apiRef.current) {
 			apiRef.current.clearBuffer();
+			console.log("   - API buffer cleared");
 		}
+		console.log("🏁 ========================");
 	};
 
 	/**
@@ -295,7 +314,19 @@ const ActivePlay = ({ navigateTo }) => {
 		
 		setShowNextRoundPrompt(false);
 
-		// Ensure Redux round is incremented for the next round
+		// CRITICAL: Check if we've reached the round limit BEFORE dispatching nextRound()
+		if (currentRound + 1 >= rounds) {
+			console.log("   - ⚠️ ROUND LIMIT REACHED! All rounds completed. Finishing game instead.");
+			console.log(`   - Final scores - Player: ${playerScoreRef.current}, Computer: ${computerScoreRef.current}, Draws: ${drawScoreRef.current}`);
+			console.log("🚀 =========================================");
+			// Redirect to game completion instead of proceeding
+			handleGameCompletion();
+			return;
+		}
+
+		console.log(`   - ✅ More rounds available. Proceeding to round ${currentRound + 2}`);
+
+		// Only increment Redux round counter if we have more rounds to play
 		dispatch(nextRound());
 
 		// Get the updated round number from Redux
@@ -306,32 +337,66 @@ const ActivePlay = ({ navigateTo }) => {
 		console.log("🚀 =========================================");
 
 		// Reset round state for the new round
-		setGameState("playing");
-		setIsCapturing(false);
-		setTimer(captureTime);
-		setPlayerChoice("");
-		setComputerChoice("");
-		setResult("");
-		setShowResult(false);
-
-		// Clear any existing timers
-		if (timerRef.current) {
-			clearInterval(timerRef.current);
-			timerRef.current = null;
-		}
+		setGameState("waiting");
+		clearRoundStateForNextRound();
 	};
 
 	/**
 	 * Proceed to the next round manually (user clicked button)
 	 */
 	const proceedToNextRoundManually = () => {
+		console.log("🚀 ===== MANUAL ROUND PROGRESSION =====");
+		console.log(`   - Current Redux Round (before nextRound): ${currentRound}`);
+		console.log(`   - Total Rounds: ${rounds}`);
+		
 		// Clear the automatic countdown if user proceeds manually
 		if (nextRoundTimeoutRef.current) {
 			clearInterval(nextRoundTimeoutRef.current);
 			nextRoundTimeoutRef.current = null;
 		}
 
-		proceedToNextRoundAutomatically();
+		setShowNextRoundPrompt(false);
+
+		// CRITICAL: Check if we've reached the round limit BEFORE dispatching nextRound()
+		if (currentRound + 1 >= rounds) {
+			console.log("   - ⚠️ ROUND LIMIT REACHED! All rounds completed. Finishing game instead.");
+			console.log(`   - Final scores - Player: ${playerScoreRef.current}, Computer: ${computerScoreRef.current}, Draws: ${drawScoreRef.current}`);
+			console.log("🚀 =========================================");
+			// Redirect to game completion instead of proceeding
+			handleGameCompletion();
+			return;
+		}
+
+		console.log(`   - ✅ More rounds available. Proceeding to round ${currentRound + 2}`);
+
+		// Only increment Redux round counter if we have more rounds to play
+		dispatch(nextRound());
+
+		// Get the updated round number from Redux
+		const nextReduxRound = currentRound + 1; // Will be the next round number (0-indexed)
+		
+		console.log(`   - Redux Round After Dispatch: ${nextReduxRound}`);
+		console.log(`   - Starting round ${nextReduxRound + 1} immediately with countdown`);
+		console.log("🚀 =========================================");
+
+		// Clear round state and immediately start countdown (bypass waiting state)
+		clearRoundStateForNextRound();
+		console.log("🔄 Setting gameState to 'countdown' - bypassing waiting state");
+		setGameState("countdown");
+		setCountdown(3);
+
+		// Start countdown timer manually for immediate progression
+		let countdownValue = 3;
+		const manualCountdownTimer = setInterval(() => {
+			countdownValue -= 1;
+			console.log(`⏰ Manual countdown: ${countdownValue}`);
+			setCountdown(countdownValue);
+
+			if (countdownValue <= 0) {
+				clearInterval(manualCountdownTimer);
+				console.log("⏰ Manual countdown complete! Capture will start via useEffect");
+			}
+		}, 1000);
 	};
 
 	/**
@@ -381,8 +446,8 @@ const ActivePlay = ({ navigateTo }) => {
 			setFinalResult, 
 			setOverlayImage, 
 			setComputerChoice, 
-			setIsCapturing,
-			setGameState
+			setIsCapturing
+			// Removed setGameState - we manage it in main component now
 		};
 		const refs = { apiRef, resultReceivedRef, frameTimestampRef, frameIntervalRef };
 		const stopCapturingFn = () => stopCapturing(frameIntervalRef, setIsCapturing);
@@ -407,6 +472,18 @@ const ActivePlay = ({ navigateTo }) => {
 			console.log("⚠️ API not available or result already received");
 			return;
 		}
+
+		// Set state to waitingForResult to show processing indicator
+		console.log("🔄 Setting gameState to 'waitingForResult' - API processing started");
+		setGameState("waitingForResult");
+
+		// Set a timeout for API processing to prevent infinite waiting
+		const apiTimeout = setTimeout(() => {
+			if (!resultReceivedRef.current) {
+				console.log("⏰ API processing timeout - using fallback result");
+				handleAPIError();
+			}
+		}, 10000); // 10 second timeout
 
 		// Check if we have frames to process
 		const bufferSize = apiRef.current.getBufferSize();
@@ -441,6 +518,7 @@ const ActivePlay = ({ navigateTo }) => {
 			}
 
 			resultReceivedRef.current = true;
+			clearTimeout(apiTimeout); // Clear the timeout since we got a result
 			console.log("🎯 Final result:", result);
 
 			// Process the result with better safety checks
@@ -455,6 +533,7 @@ const ActivePlay = ({ navigateTo }) => {
 			}
 
 			setFinalResult(result);
+			console.log("🎯 API processing complete - setting gameState to 'result'");
 			setGameState("result");
 
 			// Show result overlay and proceed to next round after delay
@@ -463,6 +542,7 @@ const ActivePlay = ({ navigateTo }) => {
 			}, 3000);
 
 		} catch (error) {
+			clearTimeout(apiTimeout); // Clear timeout on error
 			console.error("❌ Error processing frames:", error);
 			// Only handle API error if it's not just a duplicate call
 			if (!error.message.includes('Already processing') && !error.message.includes('No frames to process')) {
@@ -498,6 +578,7 @@ const ActivePlay = ({ navigateTo }) => {
 		});
 		setComputerChoice("🗿");
 		updateGameScore("computer");
+		console.log("❌ API Error fallback - setting gameState to 'result'");
 		setGameState("result");
 
 		// Show result overlay and proceed after delay
@@ -545,10 +626,35 @@ const ActivePlay = ({ navigateTo }) => {
 	// Handle game completion
 	useEffect(() => {
 		if (gameState === "finished") {
+			console.log("🏁 Game finished state detected - navigating to scores in 4 seconds");
 			setTimeout(() => {
+				console.log("🚀 Navigating to scores page");
 				navigateTo("scores");
 			}, 4000);
 		}
+	}, [gameState]);
+
+	// Handle countdown completion and start frame capture
+	useEffect(() => {
+		if (gameState === "countdown" && countdown === 0) {
+			console.log("⏰ ===== COUNTDOWN COMPLETION =====");
+			console.log("   - Countdown reached 0");
+			console.log("   - Transitioning from 'countdown' to 'capturing'");
+			console.log("   - Starting frame capture...");
+			console.log("⏰ =================================");
+			setGameState("capturing");
+			startCapturing();
+		}
+	}, [gameState, countdown]);
+
+	// Log all game state transitions
+	useEffect(() => {
+		console.log(`🎛️ ===== GAME STATE TRANSITION =====`);
+		console.log(`   - New State: ${gameState}`);
+		console.log(`   - Current Round: ${currentRound + 1}/${rounds}`);
+		console.log(`   - Is Capturing: ${isCapturing}`);
+		console.log(`   - Countdown: ${countdown}`);
+		console.log(`🎛️ ==================================`);
 	}, [gameState]);
 
 	return (
@@ -570,6 +676,7 @@ const ActivePlay = ({ navigateTo }) => {
 				<PlayerCameraSection
 					videoRef={videoRef}
 					cameraStream={cameraStream}
+					gameState={gameState}
 					isCapturing={isCapturing} // Use local state instead of gameState
 					overlayImage={overlayImage}
 					realtimeResult={realtimeResult}
@@ -605,6 +712,34 @@ const ActivePlay = ({ navigateTo }) => {
 
 			{gameState === "countdown" && (
 				<CountdownOverlay countdown={countdown} />
+			)}
+
+			{gameState === "capturing" && (
+				<div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+					<div className="text-center">
+						<div className="text-6xl mb-4 animate-pulse">📹</div>
+						<h2 className="text-3xl font-bold text-cyan-400 mb-2">
+							Show Your Move!
+						</h2>
+						<p className="text-xl text-white">
+							Capturing your gesture...
+						</p>
+					</div>
+				</div>
+			)}
+
+			{gameState === "waitingForResult" && (
+				<div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+					<div className="text-center">
+						<div className="text-6xl mb-4 animate-spin">🔄</div>
+						<h2 className="text-3xl font-bold text-purple-400 mb-2">
+							Processing Move...
+						</h2>
+						<p className="text-xl text-white">
+							AI is analyzing your gesture
+						</p>
+					</div>
+				</div>
 			)}
 
 			{gameState === "result" && finalResult && (

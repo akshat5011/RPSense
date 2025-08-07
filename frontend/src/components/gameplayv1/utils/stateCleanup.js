@@ -59,7 +59,7 @@ export const clearRoundStateForNextRound = (stateSetters, refs, stopCapturing) =
 		setOverlayImage, 
 		setComputerChoice, 
 		setIsCapturing,
-		setGameState
+		setGameState // Optional - may not be provided if managed by main component
 	} = stateSetters;
 	const { apiRef, resultReceivedRef, frameTimestampRef, frameIntervalRef } = refs;
 
@@ -73,7 +73,11 @@ export const clearRoundStateForNextRound = (stateSetters, refs, stopCapturing) =
 	setComputerChoice("🤖");
 	resultReceivedRef.current = false;
 	setIsCapturing(false);
-	setGameState("waiting");
+	
+	// Only set gameState if the setter is provided (backward compatibility)
+	if (setGameState) {
+		setGameState("waiting");
+	}
 
 	// Clear API buffer completely
 	if (apiRef.current) {

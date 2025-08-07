@@ -11,6 +11,7 @@ import StatusIndicator from "../ui/StatusIndicator";
  * @param {Object} props - Component props
  * @param {React.RefObject} props.videoRef - Reference to video element for camera display
  * @param {MediaStream|null} props.cameraStream - Active camera stream object
+ * @param {string} props.gameState - Current game state for proper UI messaging
  * @param {boolean} props.isCapturing - Whether frame capture is currently active
  * @param {string|null} props.overlayImage - Base64 image showing AI's view of current frame
  * @param {Object|null} props.realtimeResult - Real-time ML prediction results
@@ -20,19 +21,37 @@ import StatusIndicator from "../ui/StatusIndicator";
 const PlayerCameraSection = ({
   videoRef,
   cameraStream,
+  gameState,
   isCapturing,
   overlayImage,
   realtimeResult,
 }) => {
+  // Get appropriate status message based on game state
+  const getStatusMessage = () => {
+    switch (gameState) {
+      case "waiting":
+        return "Get ready to show your hand gesture";
+      case "countdown":
+        return "Get ready... countdown in progress";
+      case "capturing":
+        return "Show your hand gesture now!";
+      case "waitingForResult":
+        return "Move captured! Processing...";
+      case "result":
+        return "Round complete - result displayed";
+      case "finished":
+        return "Game complete!";
+      default:
+        return isCapturing ? "Show your hand gesture now!" : "Get ready to show your hand gesture";
+    }
+  };
   return (
     <div className="flex flex-col">
       {/* Section Header */}
       <div className="text-center mb-4">
         <h2 className="text-xl font-bold text-cyan-400 mb-2">Your Move</h2>
         <p className="text-slate-300 text-sm">
-          {isCapturing
-            ? "Show your hand gesture now!"
-            : "Get ready to show your hand gesture"}
+          {getStatusMessage()}
         </p>
       </div>
 
@@ -54,6 +73,16 @@ const PlayerCameraSection = ({
           <StatusIndicator
             isActive={true}
             label="Capturing..."
+            type="ai"
+            position="top-right"
+          />
+        )}
+
+        {/* Processing Status Indicator */}
+        {gameState === "waitingForResult" && (
+          <StatusIndicator
+            isActive={true}
+            label="Processing..."
             type="ai"
             position="top-right"
           />

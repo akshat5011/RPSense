@@ -62,7 +62,7 @@ export const startCapturing = (captureConfig, refs, stateSetters, captureFrameTo
 	}
 
 	// Initialize capture session
-	setGameState("capturing");
+	console.log("📹 Starting frame capture - frame collection only (gameState managed by main component)");
 	setIsCapturing(true);
 	resultReceivedRef.current = false;
 
