@@ -43,7 +43,8 @@ class RPSenseAPI {
    */
   async processFrames(gameData = {}) {
     if (this.isProcessing) {
-      throw new Error('Already processing frames');
+      console.log('⚠️ Already processing frames, ignoring duplicate call');
+      return Promise.reject(new Error('Already processing frames'));
     }
 
     if (this.frameBuffer.length === 0) {

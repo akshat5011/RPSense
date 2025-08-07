@@ -11,7 +11,7 @@ import Loading from "../components/CustomUI/Loading";
 import { selectCurrentView, setCurrentView } from "../redux/slices/viewSlice";
 import RPSense from "@/components/CustomUI/RPSense";
 import { changePlayerByName } from "../redux/slices/gameDataSlice";
-import ActivePlay from "@/components/gameplay/ActivePlay";
+import ActivePlay from "@/components/gameplayv1/ActivePlay";
 
 function SinglePageApp() {
   const dispatch = useDispatch();

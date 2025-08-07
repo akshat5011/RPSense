@@ -21,7 +21,10 @@ const ComputerSection = ({ computerChoice, finalResult }) => {
    */
   const getComputerState = () => {
     // Game result is available - show what computer chose
-    if (finalResult && finalResult.game_result) {
+    if (finalResult && 
+        finalResult.game_result && 
+        finalResult.game_result.computer_move && 
+        typeof finalResult.game_result.computer_move === 'string') {
       return {
         status: "revealed",
         message: `Computer chose ${finalResult.game_result.computer_move.toUpperCase()}!`,
@@ -74,7 +77,10 @@ const ComputerSection = ({ computerChoice, finalResult }) => {
         />
 
         {/* Show computer's choice name when revealed */}
-        {finalResult && finalResult.game_result && (
+        {finalResult && 
+         finalResult.game_result && 
+         finalResult.game_result.computer_move && 
+         typeof finalResult.game_result.computer_move === 'string' && (
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
             <div className="bg-purple-600/20 border border-purple-400/30 rounded-lg px-4 py-2">
               <div className="text-purple-400 text-sm font-medium text-center">
