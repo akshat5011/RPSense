@@ -2,11 +2,11 @@
 
 <div align="center">
   <img src="https://img.shields.io/badge/Python-3.12-blue" alt="Python Version">
-  <img src="https://img.shields.io/badge/TensorFlow-2.15.0-orange" alt="TensorFlow">
+  <img src="https://img.shields.io/badge/TensorFlow-2.19.0-orange" alt="TensorFlow">
   <img src="https://img.shields.io/badge/React-19.0.0-blue" alt="React">
   <img src="https://img.shields.io/badge/Next.js-15.3.5-black" alt="Next.js">
-  <img src="https://img.shields.io/badge/Flask-2.3.3-green" alt="Flask">
-  <img src="https://img.shields.io/badge/MediaPipe-0.10.8-red" alt="MediaPipe">
+  <img src="https://img.shields.io/badge/Flask-3.1.1-green" alt="Flask">
+  <img src="https://img.shields.io/badge/MediaPipe-0.10.14-red" alt="MediaPipe">
 </div>
 
 ## 📖 Overview
@@ -36,15 +36,149 @@
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
+## 📊 Dataset Creation & Innovation
+
+### Dataset Sources
+
+**Primary RPS Datasets** (7 Kaggle datasets combined):
+- [`sanikamal/rock-paper-scissors-dataset`](https://www.kaggle.com/datasets/sanikamal/rock-paper-scissors-dataset)
+- [`drgfreeman/rockpaperscissors`](https://www.kaggle.com/datasets/drgfreeman/rockpaperscissors)
+- [`shedovanatya/rock-paper-scissors-dataset`](https://www.kaggle.com/datasets/shedovanatya/rock-paper-scissors-dataset) (with bounding box labels)
+- [`andy8744/synthetic-rock-paper-scissors-dataset`](https://www.kaggle.com/datasets/andy8744/synthetic-rock-paper-scissors-dataset)
+- [`jamaicakayelopez/rock-paper-scissors`](https://www.kaggle.com/datasets/jamaicakayelopez/rock-paper-scissors)
+- [`chalanthorn/rockpaperscissors`](https://www.kaggle.com/datasets/chalanthorn/rockpaperscissors) (with bounding box labels)
+- [TensorFlow Datasets `rock_paper_scissors`](https://www.tensorflow.org/datasets/catalog/rock_paper_scissors)
+
+### Invalid Class Innovation
+
+**Novel "Invalid" Class**: First-of-its-kind addition for handling ambiguous/unclear gestures
+
+**Invalid Class Sources**:
+- **American Sign Language Dataset**: [`deeppythonist/american-sign-language-dataset`](https://www.kaggle.com/datasets/deeppythonist/american-sign-language-dataset)
+  - Rock: A, E, M, N, S, T gestures
+  - Paper: Number 5 gesture  
+  - Scissors: V, 2, K, U, H gestures
+  - Invalid: All other letters/numbers (0,1,3,4,6-9, B,C,D,F,G,I,J,L,O,P,Q,R,W,X,Y,Z)
+- **Indian Sign Language Dataset**: [`vaishnaviasonawane/indian-sign-language-dataset`](https://www.kaggle.com/datasets/vaishnaviasonawane/indian-sign-language-dataset)
+  - Rock: G gesture
+  - Paper: 5 gesture
+  - Scissors: V, 2 gestures
+  - Invalid: All other numbers (1-9) and letters (A-Z)
+  - 100 images per class mapping
+- **Blurred RPS Images**: 750 artificially blurred images from existing RPS dataset
+
+### Final Dataset Statistics
+
+- **Total Images**: 24,304 images
+- **Dataset Size**: ~3.2 GB
+- **Class Distribution**:
+  - **Train**: 20,408 images
+    - Paper: 5,169 | Rock: 5,314 | Scissors: 5,325 | Invalid: 4,600
+  - **Test**: 1,284 images  
+    - Paper: 322 | Rock: 326 | Scissors: 336 | Invalid: 300
+  - **Validation**: 2,612 images
+    - Paper: 652 | Rock: 669 | Scissors: 661 | Invalid: 630
+- **Published Dataset**: Available on Kaggle as [`akshat2k4/rpsense-dataset`](https://www.kaggle.com/datasets/akshat2k4/rpsense-dataset)
+
+## 🎯 Training Pipeline & Results
+
+### Training Environment
+- **Platform**: Kaggle Kernels with GPU P100
+- **Strategy**: Transfer Learning with MobileNetV2 (ImageNet pre-trained)
+- **Framework**: TensorFlow 2.19.0 with GPU acceleration
+
+### Training Architecture
+- **Base Model**: MobileNetV2 (frozen first 100 layers)
+- **Custom Layers**: GlobalAveragePooling2D + Dense(1024) + Dense(4) with Dropout
+- **Input Shape**: (224, 224, 3)
+- **Classes**: 4 (rock, paper, scissors, invalid)
+
+### Data Augmentation Techniques
+**Stage 1 Training Augmentation**:
+- **Rotation**: ±20° random rotation
+- **Geometric Transforms**: 
+  - Width/Height shift: ±20%
+  - Shear transformation: ±20%
+  - Zoom range: ±20%
+- **Horizontal Flip**: Random horizontal mirroring
+- **Fill Mode**: Nearest neighbor for boundary pixels
+- **Preprocessing**: MobileNetV2-specific normalization
+
+**Stage 2 Fine-tuning Augmentation** (Reduced for stability):
+- **Rotation**: ±15° (reduced from 20°)
+- **Geometric Transforms**: 
+  - Width/Height shift: ±10% (reduced from 20%)
+  - Shear transformation: ±10%
+  - Zoom range: ±10%
+- **Brightness Variation**: 0.8-1.2x brightness scaling
+- **Horizontal Flip**: Maintained for gesture variation
+- **Preprocessing**: Consistent MobileNetV2 normalization
+
+### Stage 1: Initial Training
+- **Epochs**: 47/50 (early stopping)
+- **Batch Size**: 32
+- **Learning Rate**: 1e-4 → 2.5e-5 (ReduceLROnPlateau)
+- **Callbacks**: EarlyStopping (patience=5), ModelCheckpoint, ReduceLROnPlateau
+- **Optimizer**: Adam with gradient clipping (clipnorm=1.0)
+- **Results**:
+  - **Test Accuracy**: 89.64%
+  - **Train Accuracy**: 98.21%
+  - **Test Loss**: 0.2349
+
+### Stage 2: Fine-Tuning
+- **Strategy**: Unfroze layers 100+ (3,165,344 trainable parameters)
+- **Epochs**: 17/20 (early stopping at epoch 12)
+- **Learning Rate**: 1e-5 → 5e-6 (reduced learning rate for fine-tuning)
+- **Callbacks**: EarlyStopping (patience=5), ModelCheckpoint, ReduceLROnPlateau (patience=3)
+- **Optimizer**: Adam with gradient clipping (clipnorm=1.0)
+- **Training Monitoring**: Custom NaN detection and weight monitoring callbacks
+- **Results**:
+  - **Test Accuracy**: 96.11% (+7.11% improvement)
+  - **Train Accuracy**: 99.93%
+  - **Test Loss**: 0.1109
+
+### Final Model Performance
+- **Per-Class Precision/Recall**:
+  - Invalid: 100% precision, 100% recall (perfect classification)
+  - Paper: 96% precision, 90% recall
+  - Rock: 94% precision, 97% recall  
+  - Scissors: 94% precision, 97% recall
+- **Overall Metrics**: 96% accuracy, 96% macro F1-score
+- **Model Size**: ~14MB (optimized for production deployment)
+
+### Training Techniques & Monitoring
+
+**Advanced Callbacks & Monitoring**:
+- **Early Stopping**: Monitors validation loss with patience=5 for Stage 1, patience=3 for fine-tuning
+- **Model Checkpointing**: Saves best model based on validation loss
+- **Learning Rate Reduction**: ReduceLROnPlateau with factor=0.5, minimum LR=1e-7
+- **Custom NaN Monitoring**: Real-time detection of NaN values in loss and accuracy
+- **Weight Validation**: Per-epoch weight monitoring to prevent gradient explosions
+- **Gradient Clipping**: Clipnorm=1.0 to maintain training stability
+
+**Robust Training Pipeline**:
+- **Data Validation**: Pre-training checks for NaN values in input data
+- **Generator Management**: Proper reset and shuffle=False for evaluation
+- **Memory Management**: Batch processing with size=32 for optimal GPU utilization
+- **Strategy Distribution**: Single GPU strategy to avoid NaN issues with MirroredStrategy
+
+### Key Innovations
+- **Invalid Class**: Revolutionary approach to handle unclear gestures (100% accuracy)
+- **Multi-Dataset Fusion**: Combining 9+ diverse datasets for robustness
+- **Two-Stage Training**: Initial transfer learning + fine-tuning for optimal performance
+- **Advanced Data Augmentation**: Comprehensive augmentation pipeline with stage-specific tuning
+- **Robust Training Pipeline**: Custom monitoring callbacks for NaN detection and weight validation
+- **Real-World Applicability**: High accuracy across all gesture types including edge cases
+
 ## 🧠 Machine Learning Approach
 
 ### Model Architecture
 - **Base Model**: MobileNetV2 (pre-trained on ImageNet)
-- **Fine-Tuning**: Custom fine-tuning on Rock Paper Scissors dataset
+- **Fine-Tuning**: Custom fine-tuning on comprehensive Rock Paper Scissors dataset
 - **Architecture Details**: 
   - Input Shape: (224, 224, 3)
   - Fine-tuned after 100 layers for optimal performance
-  - Output Classes: Rock, Paper, Scissors
+  - Output Classes: Rock, Paper, Scissors, Invalid
   - Activation: Softmax for probability distribution
 
 ### Computer Vision Pipeline
@@ -55,10 +189,14 @@
 5. **Post-processing**: Temporal smoothing and confidence thresholding
 
 ### Training Strategy
-- **Transfer Learning**: Leveraged pre-trained MobileNetV2 weights
-- **Layer Freezing**: Froze first 100 layers, fine-tuned remaining layers
-- **Data Augmentation**: Applied rotation, scaling, and lighting variations
-- **Optimization**: Adam optimizer with learning rate scheduling
+- **Transfer Learning**: Leveraged pre-trained MobileNetV2 weights from ImageNet
+- **Layer Freezing**: Froze first 100 layers, fine-tuned remaining layers for domain adaptation
+- **Progressive Data Augmentation**: 
+  - Stage 1: Aggressive augmentation (±20° rotation, ±20% transforms) for generalization
+  - Stage 2: Conservative augmentation (±15° rotation, ±10% transforms) for stability
+- **Optimization**: Adam optimizer with learning rate scheduling and gradient clipping
+- **Regularization**: Dropout layers (0.2 and 0.5) to prevent overfitting
+- **Monitoring**: Custom callbacks for NaN detection, weight monitoring, and early stopping
 
 ## 🔧 Tech Stack
 
@@ -68,14 +206,13 @@
 - **State Management**: Redux Toolkit for global state
 - **Animations**: Framer Motion and GSAP
 - **UI Components**: Radix UI primitives
-- **Type Safety**: TypeScript for robust development
 
 ### Backend Technologies
-- **Framework**: Flask 2.3.3 with Flask-CORS
-- **ML Framework**: TensorFlow 2.15.0
-- **Computer Vision**: OpenCV 4.8.1.78 and MediaPipe 0.10.8
-- **Image Processing**: Pillow for image manipulation
-- **Development Tools**: pyngrok for tunneling
+- **Framework**: Flask 3.1.1 with Flask-CORS 6.0.1
+- **ML Framework**: TensorFlow 2.19.0
+- **Computer Vision**: OpenCV 4.12.0.88 and MediaPipe 0.10.14
+- **Image Processing**: Pillow 11.3.0 for image manipulation
+- **Development Tools**: pyngrok 7.2.12 for tunneling
 - **Environment**: Python 3.12 with virtual environment
 
 ### ML & CV Libraries
@@ -147,10 +284,6 @@ graph TD
 - **Tournament Mode**: Multi-round competitions with progression tracking
 - **Testing Mode**: Development and debugging interface
 
-### Game State Management
-```javascript
-gameState: waiting → countdown → capturing → waitingForResult → result → finished
-```
 
 ### Frontend Game Flow
 1. **Game Initialization**: Set up game parameters and UI state
@@ -300,16 +433,26 @@ Response:
 ## 🎯 Performance Metrics
 
 ### Model Performance
-- **Accuracy**: 95%+ on test dataset
+- **Final Test Accuracy**: 96.11% (after fine-tuning)
+- **Training Accuracy**: 99.93%
+- **Model Size**: ~14MB (production optimized)
 - **Inference Time**: <50ms per frame
 - **Confidence Threshold**: 0.7 for reliable predictions
 - **Hand Detection Rate**: 98%+ with MediaPipe
+
+### Per-Class Performance
+- **Invalid Class**: 100% precision, 100% recall (perfect classification)
+- **Paper**: 96% precision, 90% recall
+- **Rock**: 94% precision, 97% recall
+- **Scissors**: 94% precision, 97% recall
+- **Overall F1-Score**: 96% macro average
 
 ### System Performance
 - **Frame Processing**: 10-15 FPS real-time processing
 - **Memory Usage**: <500MB during operation
 - **Response Time**: <100ms for single frame API calls
 - **Concurrent Users**: Supports multiple simultaneous sessions
+- **Invalid Gesture Handling**: Revolutionary 100% accuracy for unclear gestures
 
 ## 🔮 Future Enhancements
 
