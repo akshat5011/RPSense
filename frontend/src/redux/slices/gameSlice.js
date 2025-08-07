@@ -20,15 +20,19 @@ const gameSlice = createSlice({
   reducers: {
     setGameMode: (state, action) => {
       state.gameMode = action.payload;
-      // Reset rounds to 3 when switching to tournament
-      if (action.payload === "tournament" && state.rounds < 3) {
-        state.rounds = 3;
+      // Set appropriate default rounds based on game mode
+      if (action.payload === "classic") {
+        state.rounds = 1;
+      } else if (action.payload === "tournament") {
+        state.rounds = Math.max(3, state.rounds);
       }
     },
     
     setRounds: (state, action) => {
-      if (state.gameMode === "tournament") {
-        state.rounds = Math.max(3, action.payload);
+      if (state.gameMode === "classic") {
+        state.rounds = 1; // Classic mode is always 1 round
+      } else if (state.gameMode === "tournament") {
+        state.rounds = Math.max(3, action.payload); // Tournament minimum 3 rounds
       }
     },
     

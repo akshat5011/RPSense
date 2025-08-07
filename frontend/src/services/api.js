@@ -1,8 +1,10 @@
 class RPSenseAPI {
-  constructor(baseURL = 'http://localhost:5000') {
+  constructor(baseURL = process.env.NEXT_PUBLIC_ML_SERVER || 'http://localhost:5000') {
     this.baseURL = baseURL;
     this.frameBuffer = [];
     this.isProcessing = false;
+    
+    console.log(`🌐 RPSenseAPI initialized with baseURL: ${this.baseURL}`);
   }
 
   /**
