@@ -6,8 +6,8 @@ load_dotenv()
 class Config:
     # Base paths
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # MODEL_PATH = os.path.join(BASE_DIR, 'model', 'finetuned_after100layers_mobilenetv2_rpsense.h5')
-    MODEL_PATH = '/content/drive/MyDrive/RPSense_Dataset/finetuned_after100layers_mobilenetv2_rpsense.h5'
+    MODEL_PATH = os.path.join(BASE_DIR, 'model', 'finetuned_after100layers_mobilenetv2_rpsense.h5')
+    # MODEL_PATH = '/content/drive/MyDrive/RPSense_Dataset/finetuned_after100layers_mobilenetv2_rpsense.h5'
     
     # Model configuration
     MODEL_INPUT_SIZE = (224, 224)
